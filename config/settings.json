@@ -1,0 +1,30 @@
+{
+  "sheets": {
+    "columns": {
+      "companyName": "A",
+      "industry": "B",
+      "websiteUrl": "C",
+      "email": "D",
+      "contactPerson": "E",
+      "location": "F",
+      "sendApproval": "G",
+      "sentDate": "H",
+      "status": "I",
+      "notes": "J"
+    },
+    "statusValues": {
+      "pending": "未送信",
+      "sent": "送信済",
+      "replied": "返信あり",
+      "meeting": "商談中"
+    },
+    "approvalValue": "○"
+  },
+  "crawler": {
+    "defaultLimit": 20,
+    "requestDelayMs": 1500
+  },
+  "mailer": {
+    "sendIntervalMs": 3000
+  }
+}
