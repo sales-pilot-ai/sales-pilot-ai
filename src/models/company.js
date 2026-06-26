@@ -33,6 +33,7 @@ export const STATUS_VALUES = Object.freeze(['未送信', '送信済', '返信あ
  * @property {string | null}   sentDate       - 送付日（YYYY-MM-DD）
  * @property {string}          reply          - 返信内容
  * @property {string}          memo           - 備考
+ * @property {number | null}   leadScore      - リードスコア（Provider が算出する優先度スコア）
  * @property {string}          createdAt      - 作成日時（ISO 8601）
  * @property {string}          updatedAt      - 更新日時（ISO 8601）
  */
@@ -65,6 +66,7 @@ export function createCompany(data = {}) {
     sentDate: data.sentDate ?? null,
     reply: data.reply ?? '',
     memo: data.memo ?? '',
+    leadScore: data.leadScore ?? null,
     createdAt: data.createdAt ?? now,
     updatedAt: data.updatedAt ?? now,
   };
@@ -131,6 +133,19 @@ export function validateCompany(company) {
   if (company.storeCount !== null) {
     if (!Number.isInteger(company.storeCount) || company.storeCount < 0) {
       errors.push({ field: 'storeCount', message: '店舗数は 0 以上の整数である必要があります' });
+    }
+  }
+
+  if (company.leadScore !== null) {
+    if (
+      typeof company.leadScore !== 'number' ||
+      !isFinite(company.leadScore) ||
+      company.leadScore < 0
+    ) {
+      errors.push({
+        field: 'leadScore',
+        message: 'リードスコアは 0 以上の数値である必要があります',
+      });
     }
   }
 

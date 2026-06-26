@@ -19,8 +19,9 @@
       "sentDate": { "col": "P", "label": "送付日" },
       "reply": { "col": "Q", "label": "返信内容" },
       "memo": { "col": "R", "label": "備考" },
-      "createdAt": { "col": "S", "label": "作成日時" },
-      "updatedAt": { "col": "T", "label": "更新日時" }
+      "leadScore": { "col": "S", "label": "リードスコア" },
+      "createdAt": { "col": "T", "label": "作成日時" },
+      "updatedAt": { "col": "U", "label": "更新日時" }
     },
     "approvalValue": "○"
   },

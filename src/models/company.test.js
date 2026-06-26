@@ -36,6 +36,7 @@ describe('createCompany', () => {
       'sentDate',
       'reply',
       'memo',
+      'leadScore',
       'createdAt',
       'updatedAt',
     ];
@@ -58,9 +59,10 @@ describe('createCompany', () => {
   });
 
   it('数値フィールドのデフォルトは null', () => {
-    const { employeeCount, storeCount } = createCompany();
+    const { employeeCount, storeCount, leadScore } = createCompany();
     expect(employeeCount).toBeNull();
     expect(storeCount).toBeNull();
+    expect(leadScore).toBeNull();
   });
 
   it('sentDate のデフォルトは null', () => {
@@ -188,6 +190,31 @@ describe('validateCompany', () => {
     const company = createCompany({ companyName: 'テスト', storeCount: -5 });
     const errors = validateCompany(company);
     expect(errors.some((e) => e.field === 'storeCount')).toBe(true);
+  });
+
+  it('leadScore が負数でエラー', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', leadScore: -1 }));
+    expect(errors.some((e) => e.field === 'leadScore')).toBe(true);
+  });
+
+  it('leadScore が Infinity でエラー', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', leadScore: Infinity }));
+    expect(errors.some((e) => e.field === 'leadScore')).toBe(true);
+  });
+
+  it('leadScore が 0 の場合はエラーなし', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', leadScore: 0 }));
+    expect(errors.every((e) => e.field !== 'leadScore')).toBe(true);
+  });
+
+  it('leadScore が null の場合はエラーなし', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', leadScore: null }));
+    expect(errors.every((e) => e.field !== 'leadScore')).toBe(true);
+  });
+
+  it('leadScore が正の小数の場合はエラーなし', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', leadScore: 85.5 }));
+    expect(errors.every((e) => e.field !== 'leadScore')).toBe(true);
   });
 
   it('複数フィールドが不正な場合は複数エラーを返す', () => {
