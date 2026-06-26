@@ -5,6 +5,7 @@ import {
   isApproved,
   updateCompany,
   SEND_APPROVAL_VALUES,
+  STATUS,
   STATUS_VALUES,
 } from './company.js';
 
@@ -37,6 +38,8 @@ describe('createCompany', () => {
       'reply',
       'memo',
       'leadScore',
+      'timeRexUrl',
+      'sendCount',
       'createdAt',
       'updatedAt',
     ];
@@ -50,8 +53,8 @@ describe('createCompany', () => {
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   });
 
-  it('デフォルト status は "未送信"', () => {
-    expect(createCompany().status).toBe('未送信');
+  it('デフォルト status は STATUS.NEW', () => {
+    expect(createCompany().status).toBe(STATUS.NEW);
   });
 
   it('デフォルト sendApproval は ""', () => {
@@ -63,6 +66,14 @@ describe('createCompany', () => {
     expect(employeeCount).toBeNull();
     expect(storeCount).toBeNull();
     expect(leadScore).toBeNull();
+  });
+
+  it('デフォルト sendCount は 0', () => {
+    expect(createCompany().sendCount).toBe(0);
+  });
+
+  it('デフォルト timeRexUrl は ""', () => {
+    expect(createCompany().timeRexUrl).toBe('');
   });
 
   it('sentDate のデフォルトは null', () => {
@@ -86,7 +97,9 @@ describe('createCompany', () => {
       employeeCount: 50,
       storeCount: 3,
       sendApproval: '○',
-      status: '送信済',
+      status: STATUS.SENT,
+      timeRexUrl: 'https://timerex.net/s/example',
+      sendCount: 3,
     });
     expect(company.companyName).toBe('株式会社テスト');
     expect(company.email).toBe('test@example.com');
@@ -94,7 +107,9 @@ describe('createCompany', () => {
     expect(company.employeeCount).toBe(50);
     expect(company.storeCount).toBe(3);
     expect(company.sendApproval).toBe('○');
-    expect(company.status).toBe('送信済');
+    expect(company.status).toBe(STATUS.SENT);
+    expect(company.timeRexUrl).toBe('https://timerex.net/s/example');
+    expect(company.sendCount).toBe(3);
   });
 
   it('id を指定した場合はそのまま使用する', () => {
@@ -116,10 +131,11 @@ describe('validateCompany', () => {
       companyName: '株式会社テスト',
       email: 'test@example.com',
       sendApproval: '○',
-      status: '未送信',
+      status: STATUS.NEW,
       sentDate: '2024-06-01',
       employeeCount: 100,
       storeCount: 5,
+      sendCount: 0,
     });
     expect(validateCompany(company)).toEqual([]);
   });
@@ -217,6 +233,23 @@ describe('validateCompany', () => {
     expect(errors.every((e) => e.field !== 'leadScore')).toBe(true);
   });
 
+  it('sendCount が負数でエラー', () => {
+    const company = createCompany({ companyName: 'テスト', sendCount: -1 });
+    const errors = validateCompany(company);
+    expect(errors.some((e) => e.field === 'sendCount')).toBe(true);
+  });
+
+  it('sendCount が小数でエラー', () => {
+    const company = createCompany({ companyName: 'テスト', sendCount: 1.5 });
+    const errors = validateCompany(company);
+    expect(errors.some((e) => e.field === 'sendCount')).toBe(true);
+  });
+
+  it('sendCount が 0 の場合はエラーなし', () => {
+    const errors = validateCompany(createCompany({ companyName: 'テスト', sendCount: 0 }));
+    expect(errors.every((e) => e.field !== 'sendCount')).toBe(true);
+  });
+
   it('複数フィールドが不正な場合は複数エラーを返す', () => {
     const company = {
       ...createCompany(),
@@ -305,19 +338,43 @@ describe('SEND_APPROVAL_VALUES', () => {
   });
 });
 
-describe('STATUS_VALUES', () => {
-  it('必要なステータスをすべて含む', () => {
-    expect(STATUS_VALUES).toContain('未送信');
-    expect(STATUS_VALUES).toContain('送信済');
-    expect(STATUS_VALUES).toContain('返信あり');
-    expect(STATUS_VALUES).toContain('商談中');
-    expect(STATUS_VALUES).toContain('');
+describe('STATUS', () => {
+  it('6 種類のステータスを持つ', () => {
+    expect(Object.keys(STATUS)).toHaveLength(6);
+  });
+
+  it('各キーが期待値を持つ', () => {
+    expect(STATUS.NEW).toBe('NEW');
+    expect(STATUS.SENT).toBe('SENT');
+    expect(STATUS.REPLIED).toBe('REPLIED');
+    expect(STATUS.MEETING).toBe('MEETING');
+    expect(STATUS.CLOSED).toBe('CLOSED');
+    expect(STATUS.NG).toBe('NG');
   });
 
   it('freeze されている（変更不可）', () => {
     expect(() => {
       // @ts-ignore
-      STATUS_VALUES.push('新規追加');
+      STATUS.UNKNOWN = 'UNKNOWN';
+    }).toThrow();
+  });
+});
+
+describe('STATUS_VALUES', () => {
+  it('STATUS のすべての値を含む', () => {
+    for (const val of Object.values(STATUS)) {
+      expect(STATUS_VALUES).toContain(val);
+    }
+  });
+
+  it('6 要素を持つ', () => {
+    expect(STATUS_VALUES).toHaveLength(6);
+  });
+
+  it('freeze されている（変更不可）', () => {
+    expect(() => {
+      // @ts-ignore
+      STATUS_VALUES.push('UNKNOWN');
     }).toThrow();
   });
 });
