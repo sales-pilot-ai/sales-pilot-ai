@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Google Custom Search JSON API を使って業種・地域から企業リストを取得する Provider。
@@ -19,9 +20,10 @@ export class GoogleSearchProvider extends BaseProvider {
    * @param {number} [limit=20]
    * @returns {Promise<import('../models/company.js').Company[]>}
    */
-  // eslint-disable-next-line no-unused-vars
   async find(industry, area, limit = 20) {
+    logger.info(`[GoogleSearch] 「${industry}」×「${area}」(上限: ${limit}件) を検索中...`);
     // TODO: Phase 2 — Google Custom Search JSON API を実装
-    throw new Error('GoogleSearchProvider.find() は未実装です。Phase 2 で実装予定。');
+    logger.warn('[GoogleSearch] Google Custom Search API は未実装です（Phase 2 で実装予定）');
+    return [];
   }
 }

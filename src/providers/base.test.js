@@ -8,7 +8,11 @@ import { WebsiteProvider } from './website.js';
 // 全 Provider が満たすべきインターフェースを検証する。
 // 新しい Provider を追加する際はここに追加すること。
 
-/** @param {new () => BaseProvider} Provider */
+/**
+ * 全 Provider が満たすべき共通インターフェース契約。
+ * find() の戻り値（resolve/reject）は Provider ごとに異なるためここでは検証しない。
+ * @param {new () => BaseProvider} Provider
+ */
 function itBehavesLikeProvider(Provider) {
   it('BaseProvider のサブクラスである', () => {
     expect(new Provider()).toBeInstanceOf(BaseProvider);
@@ -20,16 +24,11 @@ function itBehavesLikeProvider(Provider) {
     expect(provider.name.length).toBeGreaterThan(0);
   });
 
-  it('find() が Promise を返す', () => {
+  it('find() が Promise を返す', async () => {
     const provider = new Provider();
     const result = provider.find('IT', '東京', 10);
     expect(result).toBeInstanceOf(Promise);
-    result.catch(() => {}); // 未処理 rejection を抑制
-  });
-
-  it('find() が未実装エラーを reject する', async () => {
-    const provider = new Provider();
-    await expect(provider.find('IT', '東京', 10)).rejects.toThrow();
+    await result.catch(() => {}); // 未処理 rejection を抑制
   });
 }
 
@@ -85,10 +84,41 @@ describe('GoogleMapsProvider — 共通契約', () => {
   itBehavesLikeProvider(GoogleMapsProvider);
 });
 
+describe('GoogleMapsProvider — 固有動作', () => {
+  it('find() が配列を resolve する（スタブ: 空配列）', async () => {
+    const provider = new GoogleMapsProvider();
+    const result = await provider.find('飲食店', '東京都渋谷区', 10);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('name が "GoogleMaps"', () => {
+    expect(new GoogleMapsProvider().name).toBe('GoogleMaps');
+  });
+});
+
 describe('GoogleSearchProvider — 共通契約', () => {
   itBehavesLikeProvider(GoogleSearchProvider);
 });
 
+describe('GoogleSearchProvider — 固有動作', () => {
+  it('find() が配列を resolve する（スタブ: 空配列）', async () => {
+    const provider = new GoogleSearchProvider();
+    const result = await provider.find('美容室', '大阪府', 5);
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('name が "GoogleSearch"', () => {
+    expect(new GoogleSearchProvider().name).toBe('GoogleSearch');
+  });
+});
+
 describe('WebsiteProvider — 共通契約', () => {
   itBehavesLikeProvider(WebsiteProvider);
+});
+
+describe('WebsiteProvider — 固有動作', () => {
+  it('find() が未実装エラーを reject する', async () => {
+    const provider = new WebsiteProvider();
+    await expect(provider.find('IT', '東京', 10)).rejects.toThrow('未実装');
+  });
 });

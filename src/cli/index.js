@@ -11,9 +11,12 @@ program
 
 program
   .command('find')
-  .description('業種を指定して企業リストを取得し、スプレッドシートへ保存する')
-  .argument('<industry>', '検索する業種（例: "IT企業 東京"）')
-  .option('-l, --limit <number>', '取得件数の上限', '20')
+  .description('業種・地域を指定して企業リストを取得し、スプレッドシートへ保存する')
+  .requiredOption('-i, --industry <業種>', '検索する業種（例: 飲食店）')
+  .requiredOption('-a, --area <地域>', '検索する地域（例: 東京都渋谷区）')
+  .option('-l, --limit <件数>', '最大取得件数', '20')
+  .option('--skip-analyzer', 'WebsiteAnalyzer をスキップする', false)
+  .option('--dry-run', 'スプレッドシートへの保存をスキップする', false)
   .action(findCommand);
 
 program

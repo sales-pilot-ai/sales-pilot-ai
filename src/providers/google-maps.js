@@ -1,4 +1,5 @@
 import { BaseProvider } from './base.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Google Maps Places API を使って業種・地域から企業リストを取得する Provider。
@@ -20,9 +21,10 @@ export class GoogleMapsProvider extends BaseProvider {
    * @param {number} [limit=20]
    * @returns {Promise<import('../models/company.js').Company[]>}
    */
-  // eslint-disable-next-line no-unused-vars
   async find(industry, area, limit = 20) {
+    logger.info(`[GoogleMaps] 「${industry}」×「${area}」(上限: ${limit}件) を検索中...`);
     // TODO: Phase 2 — Google Maps Places API (Nearby Search / Text Search) を実装
-    throw new Error('GoogleMapsProvider.find() は未実装です。Phase 2 で実装予定。');
+    logger.warn('[GoogleMaps] Google Maps API は未実装です（Phase 2 で実装予定）');
+    return [];
   }
 }
