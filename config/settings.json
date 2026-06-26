@@ -1,22 +1,26 @@
 {
   "sheets": {
     "columns": {
-      "companyName": "A",
-      "industry": "B",
-      "websiteUrl": "C",
-      "email": "D",
-      "contactPerson": "E",
-      "location": "F",
-      "sendApproval": "G",
-      "sentDate": "H",
-      "status": "I",
-      "notes": "J"
-    },
-    "statusValues": {
-      "pending": "未送信",
-      "sent": "送信済",
-      "replied": "返信あり",
-      "meeting": "商談中"
+      "id": { "col": "A", "label": "ID" },
+      "companyName": { "col": "B", "label": "企業名" },
+      "contactName": { "col": "C", "label": "担当者名" },
+      "industry": { "col": "D", "label": "業種" },
+      "email": { "col": "E", "label": "メールアドレス" },
+      "phone": { "col": "F", "label": "電話番号" },
+      "websiteUrl": { "col": "G", "label": "WebサイトURL" },
+      "contactFormUrl": { "col": "H", "label": "お問い合わせフォーム" },
+      "instagram": { "col": "I", "label": "Instagram" },
+      "tiktok": { "col": "J", "label": "TikTok" },
+      "location": { "col": "K", "label": "所在地" },
+      "employeeCount": { "col": "L", "label": "従業員数" },
+      "storeCount": { "col": "M", "label": "店舗数" },
+      "sendApproval": { "col": "N", "label": "送信可否" },
+      "status": { "col": "O", "label": "ステータス" },
+      "sentDate": { "col": "P", "label": "送付日" },
+      "reply": { "col": "Q", "label": "返信内容" },
+      "memo": { "col": "R", "label": "備考" },
+      "createdAt": { "col": "S", "label": "作成日時" },
+      "updatedAt": { "col": "T", "label": "更新日時" }
     },
     "approvalValue": "○"
   },
