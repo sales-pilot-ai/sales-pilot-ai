@@ -10,8 +10,9 @@ export const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
 
 export const env = {
   spreadsheetId: process.env.SPREADSHEET_ID ?? '',
-  sheetName: process.env.SHEET_NAME ?? settings.sheets?.defaultSheetName ?? '営業リスト',
+  sheetName: process.env.SHEET_NAME ?? '営業リスト',
   gmailFrom: process.env.GMAIL_FROM ?? '',
+  meetingUrl: process.env.MEETING_URL ?? '',
   sendIntervalMs: Number(process.env.SEND_INTERVAL_MS ?? settings.mailer.sendIntervalMs),
   isDryRun: process.env.DRY_RUN === 'true',
 };

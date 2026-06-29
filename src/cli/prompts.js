@@ -2,17 +2,16 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 
 /**
- * 対話形式で業種・地域・取得件数を入力させ、確認画面を表示する。
- *
- * defaultIndustry / defaultArea が渡された場合、その項目の入力はスキップされる。
- * (CLI で --industry や --area が一方だけ指定された場合に対応)
+ * 対話形式で業種・地域・取得件数を入力させる。
+ * 未指定の項目だけ質問し、提供済みの項目はスキップする。
+ * 確認画面は含まない（{@link confirmFindExecution} で行う）。
  *
  * @param {{
  *   defaultIndustry?: string,
  *   defaultArea?: string,
  *   defaultLimit?: number,
  * }} [defaults]
- * @returns {Promise<{ industry: string, area: string, limit: number, confirmed: boolean }>}
+ * @returns {Promise<{ industry: string, area: string, limit: number }>}
  */
 export async function promptFindOptions({
   defaultIndustry = '',
@@ -49,14 +48,35 @@ export async function promptFindOptions({
 
   const answers = await inquirer.prompt(questions);
 
-  const industry = defaultIndustry || answers.industry;
-  const area = defaultArea || answers.area;
-  const limit = answers.limit ?? defaultLimit;
+  return {
+    industry: defaultIndustry || answers.industry,
+    area: defaultArea || answers.area,
+    limit: answers.limit ?? defaultLimit,
+  };
+}
 
-  console.log(chalk.cyan('\n検索条件の確認:'));
+/**
+ * find コマンド実行前の最終確認画面を表示する。
+ * 検索条件に加え、保存先（SPREADSHEET_ID / SHEET_NAME）を表示する。
+ *
+ * @param {string} industry
+ * @param {string} area
+ * @param {number} limit
+ * @param {{ skipSheets?: boolean }} [options]
+ * @returns {Promise<boolean>} ユーザーが確認した場合 true
+ */
+export async function confirmFindExecution(industry, area, limit, { skipSheets = false } = {}) {
+  const spreadsheetId = process.env.SPREADSHEET_ID || '';
+  const sheetName = process.env.SHEET_NAME || '営業リスト';
+  const destination = skipSheets
+    ? chalk.dim('保存なし（dry-run）')
+    : `${spreadsheetId ? chalk.cyan(spreadsheetId) : chalk.red('(未設定)')} / ${sheetName}`;
+
+  console.log(chalk.cyan('\n検索条件の最終確認:'));
   console.log(`  業種     : ${chalk.bold(industry)}`);
   console.log(`  地域     : ${chalk.bold(area)}`);
-  console.log(`  取得件数 : ${chalk.bold(limit)} 件\n`);
+  console.log(`  取得件数 : ${chalk.bold(limit)} 件`);
+  console.log(`  保存先   : ${destination}\n`);
 
   const { confirmed } = await inquirer.prompt([
     {
@@ -67,5 +87,5 @@ export async function promptFindOptions({
     },
   ]);
 
-  return { industry, area, limit, confirmed };
+  return confirmed;
 }

@@ -18,7 +18,7 @@
       "reply": { "col": "N", "label": "返信" },
       "memo": { "col": "O", "label": "備考" },
       "leadScore": { "col": "P", "label": "LeadScore" },
-      "timeRexUrl": { "col": "Q", "label": "TimeRexURL" },
+      "timeRexUrl": { "col": "Q", "label": "MeetingURL" },
       "sendCount": { "col": "R", "label": "SendCount" }
     },
     "approvalValue": "○"

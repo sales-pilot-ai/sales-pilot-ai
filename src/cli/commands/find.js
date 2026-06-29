@@ -1,5 +1,5 @@
 import { findCompanies } from '../../crawler/find.js';
-import { promptFindOptions } from '../prompts.js';
+import { promptFindOptions, confirmFindExecution } from '../prompts.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -22,10 +22,6 @@ export async function findCommand(options) {
       defaultArea: area || '',
       defaultLimit,
     });
-    if (!answers.confirmed) {
-      logger.info('キャンセルしました');
-      return;
-    }
     industry = answers.industry;
     area = answers.area;
     limitStr = String(answers.limit);
@@ -35,6 +31,13 @@ export async function findCommand(options) {
   if (isNaN(limit) || limit <= 0) {
     logger.error('--limit は正の整数を指定してください');
     process.exit(1);
+  }
+
+  // 最終確認（検索条件 + 保存先を表示）
+  const confirmed = await confirmFindExecution(industry, area, limit, { skipSheets: dryRun });
+  if (!confirmed) {
+    logger.info('キャンセルしました');
+    return;
   }
 
   try {

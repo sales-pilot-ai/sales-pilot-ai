@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── モック ───────────────────────────────────────────────────────────────────
 
-const { mockFindCompanies, mockPromptFindOptions } = vi.hoisted(() => ({
+const { mockFindCompanies, mockPromptFindOptions, mockConfirmFindExecution } = vi.hoisted(() => ({
   mockFindCompanies: vi.fn(),
   mockPromptFindOptions: vi.fn(),
+  mockConfirmFindExecution: vi.fn(),
 }));
 
 vi.mock('../../crawler/find.js', () => ({
@@ -13,6 +14,7 @@ vi.mock('../../crawler/find.js', () => ({
 
 vi.mock('../prompts.js', () => ({
   promptFindOptions: mockPromptFindOptions,
+  confirmFindExecution: mockConfirmFindExecution,
 }));
 
 vi.mock('../../utils/logger.js', () => ({
@@ -35,6 +37,7 @@ const { logger } = await import('../../utils/logger.js');
 beforeEach(() => {
   vi.clearAllMocks();
   mockFindCompanies.mockResolvedValue([]);
+  mockConfirmFindExecution.mockResolvedValue(true);
   vi.spyOn(process, 'exit').mockImplementation(() => {
     throw new Error('process.exit');
   });
@@ -57,6 +60,49 @@ describe('findCommand', () => {
         dryRun: false,
       });
       expect(mockPromptFindOptions).not.toHaveBeenCalled();
+    });
+
+    it('confirmFindExecution を呼ぶ', async () => {
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+      });
+      expect(mockConfirmFindExecution).toHaveBeenCalledOnce();
+    });
+
+    it('confirmFindExecution に industry・area・limit を渡す', async () => {
+      await findCommand({
+        industry: '美容室',
+        area: '大阪',
+        limit: '10',
+        skipAnalyzer: false,
+        dryRun: false,
+      });
+      expect(mockConfirmFindExecution).toHaveBeenCalledWith(
+        '美容室',
+        '大阪',
+        10,
+        expect.any(Object)
+      );
+    });
+
+    it('--dry-run が confirmFindExecution の skipSheets に渡る', async () => {
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: true,
+      });
+      expect(mockConfirmFindExecution).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(Number),
+        { skipSheets: true }
+      );
     });
 
     it('findCompanies に industry・area・limit を渡す', async () => {
@@ -119,12 +165,7 @@ describe('findCommand', () => {
 
   describe('対話モード（--industry または --area が未指定）', () => {
     it('industry が未指定のとき promptFindOptions を呼ぶ', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 20 });
       await findCommand({
         industry: undefined,
         area: '東京',
@@ -136,12 +177,7 @@ describe('findCommand', () => {
     });
 
     it('area が未指定のとき promptFindOptions を呼ぶ', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 20 });
       await findCommand({
         industry: '飲食店',
         area: undefined,
@@ -153,12 +189,7 @@ describe('findCommand', () => {
     });
 
     it('両方未指定のとき promptFindOptions を呼ぶ', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 20 });
       await findCommand({
         industry: undefined,
         area: undefined,
@@ -170,12 +201,7 @@ describe('findCommand', () => {
     });
 
     it('提供済みの industry を defaultIndustry として渡す', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '美容室',
-        area: '大阪',
-        limit: 20,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '美容室', area: '大阪', limit: 20 });
       await findCommand({
         industry: '美容室',
         area: undefined,
@@ -189,12 +215,7 @@ describe('findCommand', () => {
     });
 
     it('提供済みの area を defaultArea として渡す', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 20 });
       await findCommand({
         industry: undefined,
         area: '東京',
@@ -208,12 +229,7 @@ describe('findCommand', () => {
     });
 
     it('--limit の値を defaultLimit として渡す', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 5,
-        confirmed: true,
-      });
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 5 });
       await findCommand({
         industry: undefined,
         area: undefined,
@@ -226,13 +242,8 @@ describe('findCommand', () => {
       );
     });
 
-    it('confirmed: true のとき findCompanies を実行する', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: true,
-      });
+    it('対話後も confirmFindExecution を呼ぶ', async () => {
+      mockPromptFindOptions.mockResolvedValue({ industry: '飲食店', area: '東京', limit: 20 });
       await findCommand({
         industry: undefined,
         area: undefined,
@@ -240,41 +251,7 @@ describe('findCommand', () => {
         skipAnalyzer: false,
         dryRun: false,
       });
-      expect(mockFindCompanies).toHaveBeenCalledOnce();
-    });
-
-    it('confirmed: false のとき findCompanies を実行しない', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: false,
-      });
-      await findCommand({
-        industry: undefined,
-        area: undefined,
-        limit: '20',
-        skipAnalyzer: false,
-        dryRun: false,
-      });
-      expect(mockFindCompanies).not.toHaveBeenCalled();
-    });
-
-    it('confirmed: false のとき "キャンセルしました" をログ出力する', async () => {
-      mockPromptFindOptions.mockResolvedValue({
-        industry: '飲食店',
-        area: '東京',
-        limit: 20,
-        confirmed: false,
-      });
-      await findCommand({
-        industry: undefined,
-        area: undefined,
-        limit: '20',
-        skipAnalyzer: false,
-        dryRun: false,
-      });
-      expect(logger.info).toHaveBeenCalledWith('キャンセルしました');
+      expect(mockConfirmFindExecution).toHaveBeenCalledOnce();
     });
 
     it('対話で得た値を findCompanies に渡す', async () => {
@@ -282,7 +259,6 @@ describe('findCommand', () => {
         industry: '整骨院',
         area: '神奈川県横浜市',
         limit: 8,
-        confirmed: true,
       });
       await findCommand({
         industry: undefined,
@@ -296,6 +272,32 @@ describe('findCommand', () => {
         '神奈川県横浜市',
         expect.objectContaining({ limit: 8 })
       );
+    });
+  });
+
+  describe('キャンセル', () => {
+    it('confirmFindExecution が false のとき findCompanies を実行しない', async () => {
+      mockConfirmFindExecution.mockResolvedValue(false);
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+      });
+      expect(mockFindCompanies).not.toHaveBeenCalled();
+    });
+
+    it('confirmFindExecution が false のとき "キャンセルしました" をログ出力する', async () => {
+      mockConfirmFindExecution.mockResolvedValue(false);
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+      });
+      expect(logger.info).toHaveBeenCalledWith('キャンセルしました');
     });
   });
 

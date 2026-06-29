@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { program } from 'commander';
+import { configCommand } from './commands/config.js';
 import { findCommand } from './commands/find.js';
 import { sendCommand } from './commands/send.js';
 import { statusCommand } from './commands/status.js';
@@ -8,6 +9,11 @@ program
   .name('sales-pilot')
   .description('営業リストの作成からメール送信までを半自動化するツール')
   .version('0.1.0');
+
+program
+  .command('config')
+  .description('設定を対話形式で変更する（Google Sheets ID・Sheet名・Gmail送信元・Meeting URL 等）')
+  .action(configCommand);
 
 program
   .command('find')
