@@ -20,6 +20,33 @@ export function resolveUrl(href, baseUrl) {
 // ─── Email ────────────────────────────────────────────────────────────────────
 
 /**
+ * HTML からすべてのメールアドレスを抽出して配列で返す。
+ * mailto: リンクを先に走査し、その後テキスト内をスキャンする。
+ * 重複は除去される。
+ * @param {string} html
+ * @returns {string[]}
+ */
+export function extractEmails(html) {
+  const found = new Set();
+
+  const mailtoRe = /href=["']mailto:([^"'?&\s]+)/gi;
+  let m;
+  while ((m = mailtoRe.exec(html)) !== null) {
+    found.add(m[1]);
+  }
+
+  const text = html.replace(/<[^>]+>/g, ' ');
+  const emailRe = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+  while ((m = emailRe.exec(text)) !== null) {
+    if (!/\.(png|jpg|gif|svg|webp|pdf|zip)$/i.test(m[0])) {
+      found.add(m[0]);
+    }
+  }
+
+  return [...found];
+}
+
+/**
  * HTML から最初のメールアドレスを抽出する。
  * mailto: リンクを優先し、なければテキスト内をスキャンする。
  * @param {string} html
@@ -68,6 +95,40 @@ export function extractContactFormUrl(html, baseUrl) {
       return resolveUrl(href, baseUrl);
     }
   }
+
+  return '';
+}
+
+// ─── Description ─────────────────────────────────────────────────────────────
+
+/**
+ * HTML から meta description を抽出する。
+ * `<meta name="description">` を優先し、なければ `<meta property="og:description">` を参照する。
+ * @param {string} html
+ * @returns {string}
+ */
+export function extractDescription(html) {
+  // <meta name="description" content="..."> — 属性順不定に対応
+  const nameFirst = html.match(
+    /<meta\s[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i
+  );
+  if (nameFirst) return nameFirst[1].trim();
+
+  const contentFirst = html.match(
+    /<meta\s[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/i
+  );
+  if (contentFirst) return contentFirst[1].trim();
+
+  // <meta property="og:description" content="..."> — OG フォールバック
+  const ogNameFirst = html.match(
+    /<meta\s[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i
+  );
+  if (ogNameFirst) return ogNameFirst[1].trim();
+
+  const ogContentFirst = html.match(
+    /<meta\s[^>]*content=["']([^"']+)["'][^>]*property=["']og:description["']/i
+  );
+  if (ogContentFirst) return ogContentFirst[1].trim();
 
   return '';
 }

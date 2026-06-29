@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   resolveUrl,
+  extractEmails,
   extractEmail,
   extractContactFormUrl,
+  extractDescription,
   extractInstagram,
   extractTikTok,
   extractEmployeeCount,
@@ -29,6 +31,52 @@ describe('resolveUrl', () => {
 
   it('無効な href は "" を返す', () => {
     expect(resolveUrl('javascript:void(0)', BASE)).toBe('');
+  });
+});
+
+// ─── extractEmails ────────────────────────────────────────────────────────────
+
+describe('extractEmails', () => {
+  it('mailto: リンクのメールアドレスを配列で返す', () => {
+    const html = '<a href="mailto:info@example.co.jp">メール</a>';
+    expect(extractEmails(html)).toEqual(['info@example.co.jp']);
+  });
+
+  it('複数の mailto: リンクをすべて返す', () => {
+    const html = `
+      <a href="mailto:info@example.co.jp">メール1</a>
+      <a href="mailto:contact@example.co.jp">メール2</a>
+    `;
+    const result = extractEmails(html);
+    expect(result).toContain('info@example.co.jp');
+    expect(result).toContain('contact@example.co.jp');
+  });
+
+  it('テキスト内のメールアドレスも含める', () => {
+    const html = '<p>メール: support@example.co.jp まで</p>';
+    expect(extractEmails(html)).toContain('support@example.co.jp');
+  });
+
+  it('重複するアドレスは除去する', () => {
+    const html = `
+      <a href="mailto:info@example.co.jp">mailto</a>
+      <p>info@example.co.jp</p>
+    `;
+    expect(extractEmails(html)).toHaveLength(1);
+  });
+
+  it('メールが存在しなければ空配列を返す', () => {
+    expect(extractEmails('<p>電話でのお問い合わせ</p>')).toEqual([]);
+  });
+
+  it('画像ファイル名パターンは除外する', () => {
+    const html = '<img src="logo@2x.png">';
+    expect(extractEmails(html)).toEqual([]);
+  });
+
+  it('mailto: の query string を除いたアドレスを返す', () => {
+    const html = '<a href="mailto:info@example.co.jp?subject=test">mail</a>';
+    expect(extractEmails(html)).toContain('info@example.co.jp');
   });
 });
 
@@ -103,6 +151,47 @@ describe('extractContactFormUrl', () => {
     const html =
       '<a href="#contact-form">お問い合わせ</a><a href="/contact">お問い合わせページ</a>';
     expect(extractContactFormUrl(html, BASE)).toBe('https://example.co.jp/contact');
+  });
+});
+
+// ─── extractDescription ───────────────────────────────────────────────────────
+
+describe('extractDescription', () => {
+  it('<meta name="description"> から説明を抽出する', () => {
+    const html = '<meta name="description" content="テスト会社の公式サイトです。">';
+    expect(extractDescription(html)).toBe('テスト会社の公式サイトです。');
+  });
+
+  it('属性順が逆（content が先）でも抽出する', () => {
+    const html = '<meta content="コンテンツ先のdescription" name="description">';
+    expect(extractDescription(html)).toBe('コンテンツ先のdescription');
+  });
+
+  it('meta name="description" がなければ og:description を返す', () => {
+    const html = '<meta property="og:description" content="OG の説明文です。">';
+    expect(extractDescription(html)).toBe('OG の説明文です。');
+  });
+
+  it('og:description も属性逆順に対応する', () => {
+    const html = '<meta content="OG逆順" property="og:description">';
+    expect(extractDescription(html)).toBe('OG逆順');
+  });
+
+  it('name="description" が優先される（og:description より先に返す）', () => {
+    const html = `
+      <meta name="description" content="通常description">
+      <meta property="og:description" content="OGdescription">
+    `;
+    expect(extractDescription(html)).toBe('通常description');
+  });
+
+  it('前後の空白をトリムする', () => {
+    const html = '<meta name="description" content="  空白あり  ">';
+    expect(extractDescription(html)).toBe('空白あり');
+  });
+
+  it('description が存在しなければ "" を返す', () => {
+    expect(extractDescription('<html><body><p>説明なし</p></body></html>')).toBe('');
   });
 });
 
