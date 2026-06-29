@@ -20,6 +20,7 @@ function httpError(status) {
   return { ok: false, status };
 }
 
+// トップページ: email あり + contactFormUrl あり + description あり
 const FULL_HTML = `
 <html>
 <head>
@@ -28,6 +29,40 @@ const FULL_HTML = `
 <body>
   <a href="mailto:info@example.co.jp">メール</a>
   <a href="/contact">お問い合わせ</a>
+</body>
+</html>
+`;
+
+// トップページ: email なし + contactFormUrl あり + description あり
+const TOP_NO_EMAIL = `
+<html>
+<head>
+  <meta name="description" content="トップページの概要です。">
+</head>
+<body>
+  <a href="/contact">お問い合わせ</a>
+</body>
+</html>
+`;
+
+// トップページ: email なし + contactFormUrl なし + description あり
+const TOP_NO_EMAIL_NO_CONTACT = `
+<html>
+<head>
+  <meta name="description" content="トップページの概要です。">
+</head>
+<body>
+  <p>電話でのお問い合わせのみ受け付けています。</p>
+</body>
+</html>
+`;
+
+// お問い合わせページ: email あり
+const CONTACT_HTML = `
+<html>
+<body>
+  <a href="mailto:contact@example.co.jp">メールでのお問い合わせ</a>
+  <form action="/send"><input type="submit" value="送信"></form>
 </body>
 </html>
 `;
@@ -166,5 +201,137 @@ describe('WebsiteAnalyzer.analyze', () => {
     const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
     await analyzer.analyze(company);
     expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  // ── 2 ページ目の巡回（Issue #010） ───────────────────────────────────────────
+
+  it('トップページに email があれば お問い合わせページを fetch しない', async () => {
+    // FULL_HTML には email が含まれるので 2 ページ目は不要
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('email 未取得 かつ contactFormUrl あり → お問い合わせページを fetch する', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact') return Promise.resolve(okHtml(CONTACT_HTML));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch).toHaveBeenNthCalledWith(1, 'https://example.co.jp');
+    expect(mockFetch).toHaveBeenNthCalledWith(2, 'https://example.co.jp/contact');
+  });
+
+  it('お問い合わせページから email を補完する', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact') return Promise.resolve(okHtml(CONTACT_HTML));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    const result = await analyzer.analyze(company);
+    expect(result.email).toBe('contact@example.co.jp');
+  });
+
+  it('contactFormUrl がなければ お問い合わせページを fetch しない', async () => {
+    mockFetch.mockResolvedValue(okHtml(TOP_NO_EMAIL_NO_CONTACT));
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('company.email が既にある場合は お問い合わせページを fetch しない', async () => {
+    // TOP_NO_EMAIL には contactFormUrl があるが、company.email は設定済み
+    mockFetch.mockResolvedValue(okHtml(TOP_NO_EMAIL));
+    const company = createCompany({
+      companyName: 'テスト',
+      websiteUrl: 'https://example.co.jp',
+      email: 'existing@example.co.jp',
+    });
+    await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('お問い合わせページの HTTP エラーでも トップページのパッチは適用する', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact') return Promise.resolve(httpError(500));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    const result = await analyzer.analyze(company);
+    // トップページの contactFormUrl と memo は補完される
+    expect(result.contactFormUrl).toBe('https://example.co.jp/contact');
+    expect(result.memo).toBe('トップページの概要です。');
+    // email は取得できない
+    expect(result.email).toBe('');
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('お問い合わせページ'));
+  });
+
+  it('お問い合わせページの fetch 例外でも トップページのパッチは適用する', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact')
+        return Promise.reject(new Error('Connection refused'));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    const result = await analyzer.analyze(company);
+    expect(result.contactFormUrl).toBe('https://example.co.jp/contact');
+    expect(result.memo).toBe('トップページの概要です。');
+    expect(result.email).toBe('');
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('お問い合わせページ'));
+  });
+
+  it('トップページで取得した memo は お問い合わせページ巡回後も保持される', async () => {
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact') return Promise.resolve(okHtml(CONTACT_HTML));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    const result = await analyzer.analyze(company);
+    expect(result.memo).toBe('トップページの概要です。');
+    expect(result.email).toBe('contact@example.co.jp');
+  });
+
+  it('company.contactFormUrl が既にある場合はそれを 2 ページ目として使う', async () => {
+    // トップページ: email なし・contactFormUrl なし（HTML からは抽出されない）
+    // company.contactFormUrl が既にセット済み
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL_NO_CONTACT));
+      if (url === 'https://example.co.jp/form') return Promise.resolve(okHtml(CONTACT_HTML));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    const company = createCompany({
+      companyName: 'テスト',
+      websiteUrl: 'https://example.co.jp',
+      contactFormUrl: 'https://example.co.jp/form',
+    });
+    const result = await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(result.email).toBe('contact@example.co.jp');
+  });
+
+  it('合計 2 ページのみ fetch する（3 ページ目は fetch しない）', async () => {
+    // お問い合わせページに別の contactFormUrl があっても追加で fetch しない
+    const contactWithAnotherLink = `
+      <html><body>
+        <a href="mailto:contact@example.co.jp">メール</a>
+        <a href="/another-contact">別のお問い合わせ</a>
+      </body></html>
+    `;
+    mockFetch.mockImplementation((url) => {
+      if (url === 'https://example.co.jp') return Promise.resolve(okHtml(TOP_NO_EMAIL));
+      if (url === 'https://example.co.jp/contact')
+        return Promise.resolve(okHtml(contactWithAnotherLink));
+      return Promise.reject(new Error(`3 ページ目は fetch してはいけない: ${url}`));
+    });
+    const company = createCompany({ companyName: 'テスト', websiteUrl: 'https://example.co.jp' });
+    await analyzer.analyze(company);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
