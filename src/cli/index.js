@@ -4,6 +4,8 @@ import { configCommand } from './commands/config.js';
 import { findCommand } from './commands/find.js';
 import { sendCommand } from './commands/send.js';
 import { statusCommand } from './commands/status.js';
+import { setupCommand } from './commands/setup.js';
+import { doctorCommand } from './commands/doctor.js';
 
 program
   .name('sales-pilot')
@@ -36,5 +38,15 @@ program
   .command('status')
   .description('送付日・進行ステータスをスプレッドシートへ反映する')
   .action(statusCommand);
+
+program
+  .command('setup')
+  .description('.env・認証・接続・テンプレートをまとめて確認するセットアップガイド')
+  .action(setupCommand);
+
+program
+  .command('doctor')
+  .description('現在の環境を診断して ✅/⚠️/❌ で一覧表示する')
+  .action(doctorCommand);
 
 program.parse();
