@@ -19,7 +19,8 @@
       "memo": { "col": "O", "label": "備考" },
       "leadScore": { "col": "P", "label": "LeadScore" },
       "timeRexUrl": { "col": "Q", "label": "MeetingURL" },
-      "sendCount": { "col": "R", "label": "SendCount" }
+      "sendCount": { "col": "R", "label": "SendCount" },
+      "googleMapsUrl": { "col": "S", "label": "Google Maps URL" }
     },
     "approvalValue": "○"
   },

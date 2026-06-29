@@ -109,10 +109,14 @@ describe('findCompanies', () => {
     expect(mockSearchFind).toHaveBeenCalledOnce();
   });
 
-  it('各 Provider に industry・area・limit を渡す', async () => {
+  it('各 Provider に SearchOptions を渡す', async () => {
     await findCompanies('美容室', '大阪', { limit: 5, skipSheets: true });
-    expect(mockMapsFind).toHaveBeenCalledWith('美容室', '大阪', 5);
-    expect(mockSearchFind).toHaveBeenCalledWith('美容室', '大阪', 5);
+    expect(mockMapsFind).toHaveBeenCalledWith(
+      expect.objectContaining({ industry: '美容室', area: '大阪', limit: 5 })
+    );
+    expect(mockSearchFind).toHaveBeenCalledWith(
+      expect.objectContaining({ industry: '美容室', area: '大阪', limit: 5 })
+    );
   });
 
   it('両 Provider の結果をマージして返す', async () => {

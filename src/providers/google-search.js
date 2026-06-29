@@ -15,12 +15,11 @@ export class GoogleSearchProvider extends BaseProvider {
   }
 
   /**
-   * @param {string} industry
-   * @param {string} area
-   * @param {number} [limit=20]
+   * @param {import('../models/search-options.js').SearchOptions} options
    * @returns {Promise<import('../models/company.js').Company[]>}
    */
-  async find(industry, area, limit = 20) {
+  async find(options = {}) {
+    const { industry = '', area = '', limit = 20 } = options;
     logger.info(`[GoogleSearch] 「${industry}」×「${area}」(上限: ${limit}件) を検索中...`);
     // TODO: Phase 2 — Google Custom Search JSON API を実装
     logger.warn('[GoogleSearch] Google Custom Search API は未実装です（Phase 2 で実装予定）');

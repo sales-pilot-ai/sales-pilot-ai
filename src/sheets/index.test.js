@@ -83,16 +83,16 @@ describe('appendCompanies', () => {
     await appendCompanies([company]);
     const call = mockAppend.mock.calls[0][0];
     expect(call.spreadsheetId).toBe('test-spreadsheet-id');
-    expect(call.range).toBe('テストシート!A:R');
+    expect(call.range).toBe('テストシート!A:S');
     expect(call.valueInputOption).toBe('USER_ENTERED');
   });
 
-  it('各企業を 18 要素の行として送信する', async () => {
+  it('各企業を 19 要素の行として送信する', async () => {
     const company = createCompany({ companyName: 'テスト' });
     await appendCompanies([company]);
     const rows = mockAppend.mock.calls[0][0].requestBody.values;
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveLength(18);
+    expect(rows[0]).toHaveLength(19);
   });
 
   it('API レスポンスの data を返す', async () => {
@@ -203,7 +203,7 @@ describe('getApprovedRows', () => {
     await getApprovedRows();
     const call = mockGet.mock.calls[0][0];
     expect(call.spreadsheetId).toBe('test-spreadsheet-id');
-    expect(call.range).toBe('テストシート!A:R');
+    expect(call.range).toBe('テストシート!A:S');
   });
 });
 

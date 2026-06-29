@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { GoogleSearchProvider } from './google-search.js';
+import { createSearchOptions } from '../models/search-options.js';
 
 describe('GoogleSearchProvider', () => {
   it('name が "GoogleSearch"', () => {
@@ -7,13 +8,17 @@ describe('GoogleSearchProvider', () => {
   });
 
   it('find() が配列を resolve する（スタブ: 空配列）', async () => {
-    const result = await new GoogleSearchProvider().find('飲食業', '大阪', 10);
+    const result = await new GoogleSearchProvider().find(
+      createSearchOptions({ industry: '飲食業', area: '大阪', limit: 10 })
+    );
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it('find() が引数を受け取っても reject しない', async () => {
+  it('find() が SearchOptions を受け取っても reject しない', async () => {
     await expect(
-      new GoogleSearchProvider().find('美容室', '東京都新宿区', 20)
+      new GoogleSearchProvider().find(
+        createSearchOptions({ industry: '美容室', area: '東京都新宿区', limit: 20 })
+      )
     ).resolves.toBeDefined();
   });
 

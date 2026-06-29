@@ -34,8 +34,9 @@ export const SEND_APPROVAL_VALUES = Object.freeze(['○', '×', '']);
  * @property {string}          reply          - 返信内容
  * @property {string}          memo           - 備考
  * @property {number | null}   leadScore      - リードスコア（Provider が算出する優先度スコア）
- * @property {string}          timeRexUrl     - TimeRex 予約URL
+ * @property {string}          timeRexUrl     - Meeting URL（TimeRex 等）
  * @property {number}          sendCount      - 送信済み回数（0 始まり）
+ * @property {string}          googleMapsUrl  - Google Maps URL
  * @property {string}          createdAt      - 作成日時（ISO 8601）
  * @property {string}          updatedAt      - 更新日時（ISO 8601）
  */
@@ -71,6 +72,7 @@ export function createCompany(data = {}) {
     leadScore: data.leadScore ?? null,
     timeRexUrl: data.timeRexUrl ?? '',
     sendCount: data.sendCount ?? 0,
+    googleMapsUrl: data.googleMapsUrl ?? '',
     createdAt: data.createdAt ?? now,
     updatedAt: data.updatedAt ?? now,
   };

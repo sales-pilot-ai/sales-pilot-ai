@@ -1,5 +1,6 @@
 import { GoogleMapsProvider } from '../providers/google-maps.js';
 import { GoogleSearchProvider } from '../providers/google-search.js';
+import { createSearchOptions } from '../models/search-options.js';
 import { WebsiteAnalyzer } from './website-analyzer.js';
 import { appendCompanies } from '../sheets/index.js';
 import { logger } from '../utils/logger.js';
@@ -52,13 +53,15 @@ export async function findCompanies(industry, area, options = {}) {
 
   logger.step(`「${industry}」×「${area}」で企業を検索します（上限: ${limit}件）`);
 
+  const searchOptions = createSearchOptions({ industry, area, limit });
+
   // 1. Provider ごとに取得して結合
   const rawCompanies = [];
 
   for (const provider of PROVIDERS) {
     try {
       logger.info(`[${provider.name}] 検索中...`);
-      const results = await provider.find(industry, area, limit);
+      const results = await provider.find(searchOptions);
       logger.success(`[${provider.name}] ${results.length} 件取得`);
       rawCompanies.push(...results);
     } catch (err) {

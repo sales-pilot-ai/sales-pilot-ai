@@ -11,8 +11,8 @@ import { createCompany } from '../models/company.js';
 // ─── COLUMN_FIELDS ────────────────────────────────────────────────────────────
 
 describe('COLUMN_FIELDS', () => {
-  it('18 列分のフィールド名を持つ', () => {
-    expect(COLUMN_FIELDS).toHaveLength(18);
+  it('19 列分のフィールド名を持つ', () => {
+    expect(COLUMN_FIELDS).toHaveLength(19);
   });
 
   it('A 列（companyName）から始まる', () => {
@@ -23,8 +23,12 @@ describe('COLUMN_FIELDS', () => {
     expect(COLUMN_FIELDS[16]).toBe('timeRexUrl');
   });
 
-  it('R 列（sendCount）で終わる', () => {
+  it('R 列（sendCount）を含む', () => {
     expect(COLUMN_FIELDS[17]).toBe('sendCount');
+  });
+
+  it('S 列（googleMapsUrl）で終わる', () => {
+    expect(COLUMN_FIELDS[18]).toBe('googleMapsUrl');
   });
 
   it('全フィールドが定義済みである（undefined なし）', () => {
@@ -35,8 +39,8 @@ describe('COLUMN_FIELDS', () => {
 // ─── SHEET_RANGE ──────────────────────────────────────────────────────────────
 
 describe('SHEET_RANGE', () => {
-  it('"A:R" を返す', () => {
-    expect(SHEET_RANGE).toBe('A:R');
+  it('"A:S" を返す', () => {
+    expect(SHEET_RANGE).toBe('A:S');
   });
 });
 
@@ -51,10 +55,10 @@ describe('APPROVAL_VALUE', () => {
 // ─── companyToRow ─────────────────────────────────────────────────────────────
 
 describe('companyToRow', () => {
-  it('Company を 18 要素の配列に変換する', () => {
+  it('Company を 19 要素の配列に変換する', () => {
     const company = createCompany({ companyName: 'テスト株式会社' });
     const row = companyToRow(company);
-    expect(row).toHaveLength(18);
+    expect(row).toHaveLength(19);
   });
 
   it('最初の要素が companyName になる', () => {
@@ -101,6 +105,15 @@ describe('companyToRow', () => {
     expect(row[2]).toBe('飲食'); // C: industry
     expect(row[3]).toBe('a@b.com'); // D: email
   });
+
+  it('S 列（googleMapsUrl）が 19 番目の要素になる', () => {
+    const company = createCompany({
+      companyName: 'テスト',
+      googleMapsUrl: 'https://maps.google.com/?cid=123',
+    });
+    const row = companyToRow(company);
+    expect(row[18]).toBe('https://maps.google.com/?cid=123');
+  });
 });
 
 // ─── rowToCompany ─────────────────────────────────────────────────────────────
@@ -115,10 +128,10 @@ describe('rowToCompany', () => {
     expect(company.email).toBe('info@test.co.jp');
   });
 
-  it('18 フィールドすべてを持つ', () => {
-    const row = Array(18).fill('値');
+  it('19 フィールドすべてを持つ', () => {
+    const row = Array(19).fill('値');
     const company = rowToCompany(row);
-    expect(Object.keys(company)).toHaveLength(18);
+    expect(Object.keys(company)).toHaveLength(19);
   });
 
   it('短い配列でも undefined ではなく空文字を返す', () => {
@@ -129,6 +142,7 @@ describe('rowToCompany', () => {
     expect(company.leadScore).toBe('');
     expect(company.timeRexUrl).toBe('');
     expect(company.sendCount).toBe('');
+    expect(company.googleMapsUrl).toBe('');
   });
 
   it('companyToRow → rowToCompany でラウンドトリップできる', () => {
@@ -140,6 +154,7 @@ describe('rowToCompany', () => {
       leadScore: 90,
       timeRexUrl: 'https://timerex.net/s/example',
       sendCount: 2,
+      googleMapsUrl: 'https://maps.google.com/?cid=456',
     });
     const row = companyToRow(original);
     const restored = rowToCompany(row);
@@ -149,5 +164,6 @@ describe('rowToCompany', () => {
     expect(restored.leadScore).toBe('90'); // 数値→文字列になる
     expect(restored.timeRexUrl).toBe('https://timerex.net/s/example');
     expect(restored.sendCount).toBe('2'); // 数値→文字列になる
+    expect(restored.googleMapsUrl).toBe('https://maps.google.com/?cid=456');
   });
 });

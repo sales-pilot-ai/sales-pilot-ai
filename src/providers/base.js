@@ -26,17 +26,15 @@ export class BaseProvider {
   }
 
   /**
-   * 業種・地域を指定して企業リストを取得する。
+   * 検索条件を指定して企業リストを取得する。
    * サブクラスで必ずオーバーライドすること。
    *
    * @abstract
-   * @param {string} industry - 業種（例: "飲食業"）
-   * @param {string} area     - 地域（例: "東京都渋谷区"）
-   * @param {number} [limit]  - 取得件数の上限
+   * @param {import('./search-options.js').SearchOptions} options
    * @returns {Promise<import('../models/company.js').Company[]>}
    */
   // eslint-disable-next-line no-unused-vars
-  async find(industry, area, limit) {
+  async find(options) {
     throw new Error(
       `${this.constructor.name}.find() は未実装です。サブクラスでオーバーライドしてください。`
     );

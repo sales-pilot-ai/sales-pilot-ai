@@ -3,6 +3,7 @@ import { BaseProvider } from './base.js';
 import { GoogleMapsProvider } from './google-maps.js';
 import { GoogleSearchProvider } from './google-search.js';
 import { WebsiteProvider } from './website.js';
+import { createSearchOptions } from '../models/search-options.js';
 
 // ─── 共通契約テスト ───────────────────────────────────────────────────────────
 // 全 Provider が満たすべきインターフェースを検証する。
@@ -26,7 +27,7 @@ function itBehavesLikeProvider(Provider) {
 
   it('find() が Promise を返す', async () => {
     const provider = new Provider();
-    const result = provider.find('IT', '東京', 10);
+    const result = provider.find(createSearchOptions({ industry: 'IT', area: '東京', limit: 10 }));
     expect(result).toBeInstanceOf(Promise);
     await result.catch(() => {}); // 未処理 rejection を抑制
   });
@@ -69,12 +70,14 @@ describe('BaseProvider', () => {
       constructor() {
         super('Working');
       }
-      async find(_industry, _area, _limit) {
+      async find(_options) {
         return [];
       }
     }
     const provider = new WorkingProvider();
-    await expect(provider.find('IT', '東京', 10)).resolves.toEqual([]);
+    await expect(
+      provider.find(createSearchOptions({ industry: 'IT', area: '東京', limit: 10 }))
+    ).resolves.toEqual([]);
   });
 });
 
@@ -85,10 +88,11 @@ describe('GoogleMapsProvider — 共通契約', () => {
 });
 
 describe('GoogleMapsProvider — 固有動作', () => {
-  it('find() が配列を resolve する（スタブ: 空配列）', async () => {
-    const provider = new GoogleMapsProvider();
-    const result = await provider.find('飲食店', '東京都渋谷区', 10);
-    expect(Array.isArray(result)).toBe(true);
+  it('apiKey 未設定のとき find() が reject する', async () => {
+    const provider = new GoogleMapsProvider({ client: { apiKey: '' }, delayMs: 0 });
+    await expect(
+      provider.find(createSearchOptions({ industry: '飲食店', area: '東京都渋谷区', limit: 10 }))
+    ).rejects.toThrow('GOOGLE_MAPS_API_KEY');
   });
 
   it('name が "GoogleMaps"', () => {

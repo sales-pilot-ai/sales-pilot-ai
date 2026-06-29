@@ -17,13 +17,10 @@ export class WebsiteProvider extends BaseProvider {
   }
 
   /**
-   * @param {string} industry
-   * @param {string} area
-   * @param {number} [limit=20]
+   * @param {import('../models/search-options.js').SearchOptions} _options
    * @returns {Promise<import('../models/company.js').Company[]>}
    */
-  // eslint-disable-next-line no-unused-vars
-  async find(industry, area, limit = 20) {
+  async find(_options = {}) {
     // TODO: Phase 2 — Playwright でサイトをクロールして企業情報を抽出
     throw new Error('WebsiteProvider.find() は未実装です。Phase 2 で実装予定。');
   }

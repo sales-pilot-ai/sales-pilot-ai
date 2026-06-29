@@ -40,6 +40,7 @@ describe('createCompany', () => {
       'leadScore',
       'timeRexUrl',
       'sendCount',
+      'googleMapsUrl',
       'createdAt',
       'updatedAt',
     ];
@@ -74,6 +75,10 @@ describe('createCompany', () => {
 
   it('デフォルト timeRexUrl は ""', () => {
     expect(createCompany().timeRexUrl).toBe('');
+  });
+
+  it('デフォルト googleMapsUrl は ""', () => {
+    expect(createCompany().googleMapsUrl).toBe('');
   });
 
   it('sentDate のデフォルトは null', () => {
