@@ -131,9 +131,15 @@ GOOGLE_CLIENT_SECRET=（JSON の client_secret）
 
 #### 2-4. Google Maps API キーを作成する
 
-1. 「API とサービス」→「認証情報」→「API キーを作成」
-2. キーに `Places API (New)` の制限を設定（任意だが推奨）
-3. `.env` の `GOOGLE_MAPS_API_KEY` に設定
+> **注意**: `find` コマンドは **Places API (New)** (`places.googleapis.com/v1/...`) を使用します。  
+> 旧 Places API (`maps.googleapis.com/maps/api/place/...`) は 2024 年以降に作成した新規 API キーでは利用不可です。
+
+1. 「API とサービス」→「ライブラリ」→ **「Places API (New)」** を有効化
+2. 「API とサービス」→「認証情報」→「API キーを作成」
+3. キーに `Places API (New)` の API 制限を設定（任意だが推奨）
+4. `.env` の `GOOGLE_MAPS_API_KEY` に設定
+
+設定後、`sales-pilot doctor` で API キーの有効性を確認できます。
 
 ---
 
@@ -166,7 +172,6 @@ sales-pilot setup
   ✅ GMAIL_FROM               設定済
   ✅ GMAIL_NAME               設定済
   ⚠️  MEETING_URL              未設定（省略可）
-  ❌ GOOGLE_MAPS_API_KEY      未設定
 
 [2/4] メールテンプレート確認
   ✅ テンプレートファイル      3/3 存在確認
@@ -177,6 +182,7 @@ sales-pilot setup
 [4/4] API 接続確認
   ✅ Google Sheets            接続成功
   ✅ Gmail                    接続成功
+  ✅ Google Maps API キー     API キー有効
 ```
 
 ---

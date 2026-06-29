@@ -5,6 +5,7 @@ import {
   checkGoogleAuth,
   checkSheetsConnection,
   checkGmailConnection,
+  checkMapsApiKey,
   ENV_DEFS,
   TEMPLATE_PATHS,
 } from './diagnostics.js';
@@ -148,5 +149,57 @@ describe('checkGmailConnection', () => {
     );
     expect(result.ok).toBe(false);
     expect(typeof result.hint).toBe('string');
+  });
+});
+
+// ─── checkMapsApiKey ──────────────────────────────────────────────────────────
+
+describe('checkMapsApiKey', () => {
+  it('API キーが未設定のとき ok=null', async () => {
+    const result = await checkMapsApiKey(() => '');
+    expect(result.ok).toBeNull();
+    expect(result.label).toBe('Google Maps API キー');
+    expect(typeof result.hint).toBe('string');
+  });
+
+  it('API キーが設定されていて API が成功のとき ok=true', async () => {
+    const getEnv = (k) => (k === 'GOOGLE_MAPS_API_KEY' ? 'test_key' : '');
+    const fetchFn = () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve({ places: [] }) });
+    const result = await checkMapsApiKey(getEnv, fetchFn);
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('有効');
+  });
+
+  it('API が 403 を返したとき ok=false かつ hint がある', async () => {
+    const getEnv = (k) => (k === 'GOOGLE_MAPS_API_KEY' ? 'bad_key' : '');
+    const fetchFn = () =>
+      Promise.resolve({
+        ok: false,
+        status: 403,
+        json: () => Promise.resolve({ error: { message: 'API key not valid' } }),
+      });
+    const result = await checkMapsApiKey(getEnv, fetchFn);
+    expect(result.ok).toBe(false);
+    expect(result.hint).toContain('API key not valid');
+  });
+
+  it('ネットワークエラーのとき ok=false かつ hint がある', async () => {
+    const getEnv = (k) => (k === 'GOOGLE_MAPS_API_KEY' ? 'test_key' : '');
+    const fetchFn = () => Promise.reject(new Error('network error'));
+    const result = await checkMapsApiKey(getEnv, fetchFn);
+    expect(result.ok).toBe(false);
+    expect(result.hint).toContain('network error');
+  });
+
+  it('API キーが設定されているとき X-Goog-Api-Key ヘッダーで fetch を呼ぶ', async () => {
+    const getEnv = (k) => (k === 'GOOGLE_MAPS_API_KEY' ? 'my_key' : '');
+    let capturedOptions;
+    const fetchFn = (_url, options) => {
+      capturedOptions = options;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    };
+    await checkMapsApiKey(getEnv, fetchFn);
+    expect(capturedOptions.headers['X-Goog-Api-Key']).toBe('my_key');
   });
 });

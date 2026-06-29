@@ -95,6 +95,61 @@ export function checkTemplateFiles(existsFn = (p) => existsSync(resolve(p))) {
   };
 }
 
+// ─── Maps API キーチェック（DI 対応）─────────────────────────────────────────
+
+/**
+ * Google Maps API キーの有無と有効性を検査する。
+ * @param {(key: string) => string | undefined} [getEnv]
+ * @param {typeof fetch} [fetchFn]
+ * @returns {Promise<CheckResult>}
+ */
+export async function checkMapsApiKey(
+  getEnv = (k) => process.env[k],
+  fetchFn = (...args) => fetch(...args)
+) {
+  const apiKey = getEnv('GOOGLE_MAPS_API_KEY');
+  if (!apiKey) {
+    return {
+      label: 'Google Maps API キー',
+      ok: null,
+      message: '未設定（find コマンドは使えません）',
+      hint: 'Google Cloud Console → API とサービス → 認証情報 → API キーを作成\n    Places API (New) を有効化してください',
+    };
+  }
+
+  try {
+    const res = await fetchFn('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': apiKey,
+        'X-Goog-FieldMask': 'places.id',
+      },
+      body: JSON.stringify({ textQuery: 'test', languageCode: 'ja', pageSize: 1 }),
+    });
+
+    if (res.ok) {
+      return { label: 'Google Maps API キー', ok: true, message: 'API キー有効' };
+    }
+
+    const err = await res.json().catch(() => ({}));
+    const msg = err.error?.message ?? `HTTP ${res.status}`;
+    return {
+      label: 'Google Maps API キー',
+      ok: false,
+      message: 'API キーが無効',
+      hint: `詳細: ${msg}\n    Cloud Console で Places API (New) が有効化されているか確認してください`,
+    };
+  } catch (err) {
+    return {
+      label: 'Google Maps API キー',
+      ok: false,
+      message: 'API 接続失敗',
+      hint: `詳細: ${err.message}`,
+    };
+  }
+}
+
 // ─── 接続チェック関数（DI 対応）────────────────────────────────────────────────
 
 /**
@@ -163,6 +218,7 @@ export async function checkGmailConnection(createMailerFn = createMailer) {
  *   createAuthFn?: () => Promise<unknown>,
  *   createServiceFn?: () => Promise<unknown>,
  *   createMailerFn?: () => Promise<unknown>,
+ *   fetchFn?: typeof fetch,
  * }} DiagnosticsOptions
  */
 
@@ -176,13 +232,15 @@ export async function runAllChecks({
   createAuthFn,
   createServiceFn,
   createMailerFn,
+  fetchFn,
 } = {}) {
   const envResults = checkEnvVars(getEnv);
   const templateResult = checkTemplateFiles(existsFn);
-  const [authResult, sheetsResult, gmailResult] = await Promise.all([
+  const [authResult, sheetsResult, gmailResult, mapsKeyResult] = await Promise.all([
     checkGoogleAuth(createAuthFn),
     checkSheetsConnection(createServiceFn),
     checkGmailConnection(createMailerFn),
+    checkMapsApiKey(getEnv, fetchFn),
   ]);
 
   return {
@@ -191,5 +249,6 @@ export async function runAllChecks({
     auth: authResult,
     sheets: sheetsResult,
     gmail: gmailResult,
+    mapsKey: mapsKeyResult,
   };
 }

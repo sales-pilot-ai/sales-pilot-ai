@@ -1,13 +1,39 @@
-const TEXT_SEARCH_URL = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
-const DETAIL_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
-const DETAIL_FIELDS =
-  'place_id,name,formatted_address,formatted_phone_number,website,url,business_status,types';
+// Places API (New) エンドポイント
+// 旧 API（maps.googleapis.com/maps/api/place/...）は 2024 年以降の新規 API キーでは利用不可
+const TEXT_SEARCH_URL = 'https://places.googleapis.com/v1/places:searchText';
+const DETAIL_BASE_URL = 'https://places.googleapis.com/v1/places';
+
+const TEXT_SEARCH_FIELD_MASK = [
+  'places.id',
+  'places.displayName',
+  'places.formattedAddress',
+  'places.businessStatus',
+  'places.types',
+  'places.rating',
+  'places.userRatingCount',
+].join(',');
+
+const DETAIL_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'internationalPhoneNumber',
+  'websiteUri',
+  'googleMapsUri',
+  'businessStatus',
+  'types',
+].join(',');
 
 /**
- * Google Places API（Text Search / Place Details）の HTTP クライアント。
+ * Google Places API (New) の HTTP クライアント。
  *
  * このクラスは HTTP 通信のみを担う。オーケストレーション・Company マッピングは
  * {@link GoogleMapsProvider} が行う。DI によりテスト時にモック差し替え可能。
+ *
+ * - Text Search: POST リクエスト + X-Goog-FieldMask ヘッダー
+ * - Place Details: GET リクエスト + X-Goog-FieldMask ヘッダー
+ * - 認証: X-Goog-Api-Key ヘッダー（URL パラメータではない）
+ * - エラー: HTTP ステータスコードで判定（旧 API の status フィールドは不要）
  */
 export class PlacesClient {
   /**
@@ -20,7 +46,7 @@ export class PlacesClient {
   }
 
   /**
-   * Places Text Search API を呼び出してページ単位の結果を返す。
+   * Places Text Search (New) を呼び出してページ単位の結果を返す。
    *
    * @param {string} query  検索クエリ（例: "飲食店 東京都渋谷区"）
    * @param {string|null} [pageToken]  次ページトークン
@@ -40,36 +66,45 @@ export class PlacesClient {
   async textSearch(query, pageToken = null) {
     if (!this.apiKey) throw new Error('GOOGLE_MAPS_API_KEY が .env に設定されていません');
 
-    const params = new URLSearchParams({ query, language: this.language, key: this.apiKey });
-    if (pageToken) params.set('pagetoken', pageToken);
+    const body = { textQuery: query, languageCode: this.language, pageSize: 20 };
+    if (pageToken) body.pageToken = pageToken;
 
-    const res = await fetch(`${TEXT_SEARCH_URL}?${params}`);
-    if (!res.ok) throw new Error(`Places Text Search HTTP エラー: ${res.status}`);
+    const res = await fetch(TEXT_SEARCH_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': TEXT_SEARCH_FIELD_MASK,
+      },
+      body: JSON.stringify(body),
+    });
 
-    const data = await res.json();
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      const msg = data.error_message ? ` - ${data.error_message}` : '';
-      throw new Error(`Places Text Search API エラー: ${data.status}${msg}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err.error?.message ?? '';
+      throw new Error(`Places Text Search HTTP エラー: ${res.status}${msg ? ` - ${msg}` : ''}`);
     }
 
+    const data = await res.json();
+
     return {
-      results: (data.results ?? []).map((r) => ({
-        placeId: r.place_id,
-        name: r.name ?? '',
-        formattedAddress: r.formatted_address ?? '',
-        businessStatus: r.business_status ?? '',
-        types: r.types ?? [],
-        rating: r.rating ?? null,
-        userRatingsTotal: r.user_ratings_total ?? null,
+      results: (data.places ?? []).map((p) => ({
+        placeId: p.id,
+        name: p.displayName?.text ?? '',
+        formattedAddress: p.formattedAddress ?? '',
+        businessStatus: p.businessStatus ?? '',
+        types: p.types ?? [],
+        rating: p.rating ?? null,
+        userRatingsTotal: p.userRatingCount ?? null,
       })),
-      nextPageToken: data.next_page_token ?? null,
+      nextPageToken: data.nextPageToken ?? null,
     };
   }
 
   /**
-   * Place Details API を呼び出して詳細情報を返す。
+   * Place Details (New) を呼び出して詳細情報を返す。
    *
-   * @param {string} placeId
+   * @param {string} placeId  Text Search の結果に含まれる places.id
    * @returns {Promise<{
    *   placeId: string,
    *   name: string,
@@ -82,31 +117,29 @@ export class PlacesClient {
    * }>}
    */
   async getDetail(placeId) {
-    const params = new URLSearchParams({
-      place_id: placeId,
-      fields: DETAIL_FIELDS,
-      language: this.language,
-      key: this.apiKey,
+    const res = await fetch(`${DETAIL_BASE_URL}/${placeId}`, {
+      headers: {
+        'X-Goog-Api-Key': this.apiKey,
+        'X-Goog-FieldMask': DETAIL_FIELD_MASK,
+      },
     });
 
-    const res = await fetch(`${DETAIL_URL}?${params}`);
-    if (!res.ok) throw new Error(`Place Details HTTP エラー: ${res.status}`);
-
-    const data = await res.json();
-    if (data.status !== 'OK') {
-      const msg = data.error_message ? ` - ${data.error_message}` : '';
-      throw new Error(`Place Details API エラー: ${data.status}${msg}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const msg = err.error?.message ?? '';
+      throw new Error(`Place Details HTTP エラー: ${res.status}${msg ? ` - ${msg}` : ''}`);
     }
 
-    const r = data.result;
+    const r = await res.json();
+
     return {
-      placeId: r.place_id,
-      name: r.name ?? '',
-      formattedAddress: r.formatted_address ?? '',
-      formattedPhoneNumber: r.formatted_phone_number ?? '',
-      website: r.website ?? '',
-      googleMapsUrl: r.url ?? '',
-      businessStatus: r.business_status ?? '',
+      placeId: r.id,
+      name: r.displayName?.text ?? '',
+      formattedAddress: r.formattedAddress ?? '',
+      formattedPhoneNumber: r.internationalPhoneNumber ?? '',
+      website: r.websiteUri ?? '',
+      googleMapsUrl: r.googleMapsUri ?? '',
+      businessStatus: r.businessStatus ?? '',
       types: r.types ?? [],
     };
   }

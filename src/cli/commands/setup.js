@@ -70,9 +70,17 @@ export async function setupCommand() {
   printSection(4, TOTAL, 'API 接続確認');
   printResult(checks.sheets);
   printResult(checks.gmail);
+  printResult(checks.mapsKey);
 
   // ─── サマリー ──────────────────────────────────────────────────────────────
-  const all = [...checks.env, checks.templates, checks.auth, checks.sheets, checks.gmail];
+  const all = [
+    ...checks.env,
+    checks.templates,
+    checks.auth,
+    checks.sheets,
+    checks.gmail,
+    checks.mapsKey,
+  ];
   const errors = all.filter((r) => r.ok === false);
   const warnings = all.filter((r) => r.ok === null);
 
