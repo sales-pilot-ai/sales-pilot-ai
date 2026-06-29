@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { getApprovedRows } from '../../sheets/index.js';
 import { createMailer, loadTemplate, renderTemplate } from '../../gmail/index.js';
 import { updateStatus } from '../../sheets/index.js';
+import { createPersonalizedContent } from '../../personalizer/index.js';
 import { env } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
@@ -77,10 +78,12 @@ export async function sendCommand(options) {
     const mailer = dryRun ? null : await createMailer();
 
     for (const company of companies) {
+      const { introText } = await createPersonalizedContent(company);
       const vars = {
         companyName: company.companyName,
         contactName: company.contactName || 'ご担当者',
         meetingUrl: env.meetingUrl,
+        introText,
       };
 
       const subject = subjectTemplate
