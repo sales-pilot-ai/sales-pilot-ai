@@ -1,26 +1,17 @@
 import { existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { getApprovedRows } from '../../sheets/index.js';
+import { getApprovedRows, updateStatus } from '../../sheets/index.js';
 import { createMailer, loadTemplate, renderTemplate } from '../../gmail/index.js';
-import { updateStatus } from '../../sheets/index.js';
 import { createPersonalizedContent } from '../../personalizer/index.js';
+import { shouldSkip } from './send-filter.js';
+import { SEND_STATUS } from '../../constants/index.js';
 import { env } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = resolve(__dirname, '../../../templates/emails');
 
-/**
- * テンプレートファイル群を読み込む。
- * HTML・件名ファイルが存在しなければ null を返す。
- * @param {string} name  ファイル名（拡張子なし）
- * @returns {{
- *   textTemplate: string,
- *   htmlTemplate: string | null,
- *   subjectTemplate: string | null,
- * }}
- */
 function loadEmailTemplates(name) {
   const txtPath = resolve(TEMPLATES_DIR, `${name}.txt`);
   const htmlPath = resolve(TEMPLATES_DIR, `${name}.html`);
@@ -32,10 +23,6 @@ function loadEmailTemplates(name) {
   };
 }
 
-/**
- * .env の送信者情報からテキスト署名を生成する。
- * @returns {string}
- */
 function buildTextSignature() {
   const parts = ['--'];
   if (env.gmailName) parts.push(env.gmailName);
@@ -43,10 +30,6 @@ function buildTextSignature() {
   return parts.join('\n');
 }
 
-/**
- * .env の送信者情報から HTML 署名を生成する。
- * @returns {string}
- */
 function buildHtmlSignature() {
   const lines = [];
   if (env.gmailName) lines.push(`<strong>${env.gmailName}</strong>`);
@@ -56,18 +39,20 @@ function buildHtmlSignature() {
 }
 
 /**
- * @param {{ dryRun?: boolean }} options
+ * @param {{ dryRun?: boolean, force?: boolean }} options
  */
 export async function sendCommand(options) {
   const dryRun = options.dryRun ?? env.isDryRun;
+  const force = options.force ?? false;
 
-  if (dryRun) {
-    logger.warn('DRY RUNモード: メールは実際には送信されません');
-  }
+  if (dryRun) logger.warn('DRY RUNモード: メールは実際には送信されません');
+  if (force) logger.warn('--force モード: 送信済企業にも送信します');
+
+  const counts = { sent: 0, skipped: 0, failed: 0 };
 
   try {
     const companies = await getApprovedRows();
-    logger.info(`送信対象: ${companies.length}件`);
+    logger.info(`送信可否○の企業: ${companies.length}件`);
 
     if (companies.length === 0) {
       logger.info('送信対象がありません');
@@ -78,6 +63,14 @@ export async function sendCommand(options) {
     const mailer = dryRun ? null : await createMailer();
 
     for (const company of companies) {
+      const { skip, reason } = shouldSkip(company, { force });
+
+      if (skip) {
+        logger.info(`[スキップ] ${company.companyName} (${reason})`);
+        counts.skipped++;
+        continue;
+      }
+
       const { introText } = await createPersonalizedContent(company);
       const vars = {
         companyName: company.companyName,
@@ -99,30 +92,40 @@ export async function sendCommand(options) {
         logger.warn(`[DRY RUN] To: ${company.email}`);
         logger.warn(`[DRY RUN] Subject: ${subject}`);
         logger.warn(`[DRY RUN] Body:\n${textBody}`);
+        counts.sent++;
         continue;
       }
 
-      const { messageId } = await mailer.send({
-        to: company.email,
-        subject,
-        textBody,
-        htmlBody,
-      });
+      try {
+        const { messageId } = await mailer.send({
+          to: company.email,
+          subject,
+          textBody,
+          htmlBody,
+        });
 
-      await updateStatus(company._rowIndex, {
-        sentDate: new Date().toISOString().slice(0, 10),
-        status: '送信済',
-        sendCount: String((Number(company.sendCount) || 0) + 1),
-      });
+        await updateStatus(company._rowIndex, {
+          sentDate: new Date().toISOString().slice(0, 10),
+          status: SEND_STATUS.SENT,
+          sendCount: String((Number(company.sendCount) || 0) + 1),
+        });
 
-      logger.success(`送信完了: ${company.companyName} (${company.email}) [${messageId}]`);
+        logger.success(`送信完了: ${company.companyName} (${company.email}) [${messageId}]`);
+        counts.sent++;
+      } catch (err) {
+        logger.error(`送信失敗: ${company.companyName} (${company.email}): ${err.message}`);
+        await updateStatus(company._rowIndex, { status: SEND_STATUS.FAILED }).catch(() => {});
+        counts.failed++;
+      }
 
       await new Promise((r) => setTimeout(r, env.sendIntervalMs));
     }
-
-    logger.success('送信処理が完了しました');
   } catch (err) {
     logger.error(err.message);
     process.exit(1);
   }
+
+  logger.info(
+    `完了 — 送信: ${counts.sent}件  スキップ: ${counts.skipped}件  失敗: ${counts.failed}件`
+  );
 }
