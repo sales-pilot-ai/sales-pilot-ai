@@ -1,7 +1,14 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { google } from 'googleapis';
 
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+// OAuth トークンは Sheets と Gmail の両方をカバーする（sales-pilot auth で一括取得）
+export const OAUTH_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+  'https://www.googleapis.com/auth/gmail.send',
+];
+
+// サービスアカウントは Sheets のみ（Gmail は domain-wide delegation が必要なため）
+const SHEETS_SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 /**
  * サービスアカウント認証クライアントを作成する。
@@ -10,7 +17,7 @@ const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
  */
 async function createServiceAccountAuth() {
   const keyFile = process.env.GOOGLE_SERVICE_ACCOUNT_KEY ?? 'credentials/service-account.json';
-  const auth = new google.auth.GoogleAuth({ keyFile, scopes: SCOPES });
+  const auth = new google.auth.GoogleAuth({ keyFile, scopes: SHEETS_SCOPES });
   return auth.getClient();
 }
 
@@ -72,6 +79,7 @@ export async function createAuth() {
 /**
  * OAuth2 認証 URL を生成する。
  * "sales-pilot auth" コマンドで使用する。
+ * OAUTH_SCOPES（Sheets + Gmail）を一括でリクエストする。
  * @returns {string}
  */
 export function getOAuthAuthUrl() {
@@ -84,7 +92,7 @@ export function getOAuthAuthUrl() {
   }
 
   const client = new google.auth.OAuth2(clientId, clientSecret, redirectUri);
-  return client.generateAuthUrl({ access_type: 'offline', scope: SCOPES });
+  return client.generateAuthUrl({ access_type: 'offline', scope: OAUTH_SCOPES });
 }
 
 /**

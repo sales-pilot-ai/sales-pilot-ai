@@ -12,6 +12,7 @@ export const env = {
   spreadsheetId: process.env.SPREADSHEET_ID ?? '',
   sheetName: process.env.SHEET_NAME ?? '営業リスト',
   gmailFrom: process.env.GMAIL_FROM ?? '',
+  gmailName: process.env.GMAIL_NAME ?? '',
   meetingUrl: process.env.MEETING_URL ?? '',
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? '',
   sendIntervalMs: Number(process.env.SEND_INTERVAL_MS ?? settings.mailer.sendIntervalMs),
