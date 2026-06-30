@@ -9,10 +9,11 @@ import { logger } from '../../utils/logger.js';
  *   limit: string,
  *   skipAnalyzer: boolean,
  *   dryRun: boolean,
+ *   yes: boolean,
  * }} options
  */
 export async function findCommand(options) {
-  let { industry, area, limit: limitStr, skipAnalyzer, dryRun } = options;
+  let { industry, area, limit: limitStr, skipAnalyzer, dryRun, yes } = options;
 
   // --industry / --area が未指定のときは対話形式で補完する
   if (!industry || !area) {
@@ -33,11 +34,13 @@ export async function findCommand(options) {
     process.exit(1);
   }
 
-  // 最終確認（検索条件 + 保存先を表示）
-  const confirmed = await confirmFindExecution(industry, area, limit, { skipSheets: dryRun });
-  if (!confirmed) {
-    logger.info('キャンセルしました');
-    return;
+  // 最終確認（--yes/-y 指定時はスキップ）
+  if (!yes) {
+    const confirmed = await confirmFindExecution(industry, area, limit, { skipSheets: dryRun });
+    if (!confirmed) {
+      logger.info('キャンセルしました');
+      return;
+    }
   }
 
   try {

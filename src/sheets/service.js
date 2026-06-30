@@ -1,12 +1,10 @@
-import { settings } from '../config/index.js';
 import { logger } from '../utils/logger.js';
 import {
-  COLUMN_FIELDS,
-  SHEET_RANGE,
   APPROVAL_VALUE,
-  HEADER_ROW,
-  companyToRow,
-  rowToCompany,
+  HEADER_TO_FIELD,
+  colIndexToLetter,
+  companyToRowByHeaders,
+  rowToCompanyByHeaders,
 } from './mapper.js';
 
 /**
@@ -15,8 +13,8 @@ import {
  * sheetsApi をコンストラクタで注入することで、
  * テスト時は googleapis を一切モックせずに動作を検証できる。
  *
- * 本番環境では createSheetsService()（index.js）を使って生成する。
- * テスト環境では new SheetsService({ sheetsApi: mockApi, ... }) で直接生成する。
+ * シートの列順はヘッダー行（1 行目）から動的に取得する。
+ * 列の順番が変わっても、ヘッダー名が同じであれば正しく読み書きできる。
  *
  * @example 本番
  *   import { createSheetsService } from './index.js';
@@ -39,7 +37,9 @@ export class SheetsService {
     if (!sheetsApi) throw new Error('sheetsApi は必須です');
     this._api = sheetsApi;
     this._spreadsheetId = spreadsheetId ?? process.env.SPREADSHEET_ID ?? '';
-    this._sheetName = sheetName ?? process.env.SHEET_NAME ?? '営業リスト';
+    this._sheetName = sheetName ?? (process.env.SHEET_NAME || '営業リスト');
+    /** @type {{ headers: string[], fieldToColLetter: Map<string,string>, fieldToColIndex: Map<string,number> } | null} */
+    this._headerCache = null;
   }
 
   _requireSpreadsheetId() {
@@ -47,6 +47,39 @@ export class SheetsService {
       throw new Error('SPREADSHEET_ID が .env に設定されていません');
     }
     return this._spreadsheetId;
+  }
+
+  /**
+   * ヘッダー配列からキャッシュオブジェクトを構築する。
+   * @param {string[]} headers
+   */
+  _buildHeaderCache(headers) {
+    const fieldToColLetter = new Map();
+    const fieldToColIndex = new Map();
+    headers.forEach((header, i) => {
+      const field = HEADER_TO_FIELD[header];
+      if (field) {
+        fieldToColLetter.set(field, colIndexToLetter(i));
+        fieldToColIndex.set(field, i);
+      }
+    });
+    return { headers, fieldToColLetter, fieldToColIndex };
+  }
+
+  /**
+   * シートの 1 行目を読み取ってヘッダーキャッシュを返す。
+   * 2 回目以降はキャッシュを返す（API 呼び出しなし）。
+   */
+  async _loadHeaders() {
+    if (this._headerCache) return this._headerCache;
+    const spreadsheetId = this._requireSpreadsheetId();
+    const res = await this._api.spreadsheets.values.get({
+      spreadsheetId,
+      range: `${this._sheetName}!1:1`,
+    });
+    const headers = ((res.data.values ?? [])[0] ?? []).map(String);
+    this._headerCache = this._buildHeaderCache(headers);
+    return this._headerCache;
   }
 
   /**
@@ -62,10 +95,12 @@ export class SheetsService {
       return null;
     }
 
-    const rows = companies.map(companyToRow);
+    const { headers } = await this._loadHeaders();
+    const rows = companies.map((c) => companyToRowByHeaders(c, headers));
+
     const response = await this._api.spreadsheets.values.append({
       spreadsheetId,
-      range: `${this._sheetName}!${SHEET_RANGE}`,
+      range: `${this._sheetName}!A1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: rows },
     });
@@ -76,46 +111,61 @@ export class SheetsService {
 
   /**
    * 送信可否が「○」の行を取得して返す。
-   * 返り値オブジェクトには _rowIndex プロパティ（1 始まり行番号）が付与される。
+   * 1 行目はヘッダーとして扱い、返り値オブジェクトには _rowIndex（1 始まり行番号）が付与される。
    * @returns {Promise<Array<Record<string, string> & { _rowIndex: number }>>}
    */
   async getApprovedRows() {
     const spreadsheetId = this._requireSpreadsheetId();
 
-    const response = await this._api.spreadsheets.values.get({
+    const res = await this._api.spreadsheets.values.get({
       spreadsheetId,
-      range: `${this._sheetName}!${SHEET_RANGE}`,
+      range: `${this._sheetName}`,
     });
 
-    const allRows = response.data.values ?? [];
-    const dataRows = HEADER_ROW ? allRows.slice(1) : allRows;
-    const rowOffset = HEADER_ROW ? 2 : 1;
+    const allRows = res.data.values ?? [];
+    if (!allRows.length) return [];
 
-    const approvalColIndex = COLUMN_FIELDS.indexOf('sendApproval');
+    const headers = allRows[0].map(String);
+
+    // getApprovedRows で取得したヘッダーをキャッシュに反映（後続の update 呼び出しで再取得しない）
+    if (!this._headerCache) {
+      this._headerCache = this._buildHeaderCache(headers);
+    }
+
+    const { fieldToColIndex } = this._headerCache;
+    const dataRows = allRows.slice(1);
+    const rowOffset = 2; // 1-based、ヘッダー行分ずらす
+
+    const approvalColIndex = fieldToColIndex.get('sendApproval') ?? -1;
+    if (approvalColIndex === -1) return [];
 
     return dataRows
       .map((row, i) => ({ row, rowIndex: i + rowOffset }))
       .filter(({ row }) => (row[approvalColIndex] ?? '') === APPROVAL_VALUE)
-      .map(({ row, rowIndex }) => ({ ...rowToCompany(row), _rowIndex: rowIndex }));
+      .map(({ row, rowIndex }) => ({
+        ...rowToCompanyByHeaders(row, headers),
+        _rowIndex: rowIndex,
+      }));
   }
 
   /**
    * 指定行のフィールドを一括更新する。
    * values のキーは Company フィールド名（例: { status: '送信済', sentDate: '2024-06-26' }）。
-   * settings.json の列定義に存在しないフィールドはスキップされる。
+   * ヘッダーに存在しないフィールドはスキップされる。
    * @param {number} rowIndex  シートの行番号（1 始まり）
    * @param {Record<string, string | number | null>} values  更新内容
    * @returns {Promise<object | null>} Sheets API レスポンス。更新対象がなければ null。
    */
   async updateStatus(rowIndex, values) {
     const spreadsheetId = this._requireSpreadsheetId();
+    const { fieldToColLetter } = await this._loadHeaders();
 
     const data = Object.entries(values)
       .map(([field, value]) => {
-        const colDef = settings.sheets.columns[field];
-        if (!colDef) return null;
+        const colLetter = fieldToColLetter.get(field);
+        if (!colLetter) return null;
         return {
-          range: `${this._sheetName}!${colDef.col}${rowIndex}`,
+          range: `${this._sheetName}!${colLetter}${rowIndex}`,
           values: [[value ?? '']],
         };
       })

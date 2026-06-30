@@ -1,27 +1,5 @@
 {
   "sheets": {
-    "headerRow": true,
-    "columns": {
-      "companyName": { "col": "A", "label": "会社名" },
-      "contactName": { "col": "B", "label": "担当者名" },
-      "industry": { "col": "C", "label": "業種" },
-      "email": { "col": "D", "label": "メールアドレス" },
-      "phone": { "col": "E", "label": "電話番号" },
-      "websiteUrl": { "col": "F", "label": "企業URL" },
-      "contactFormUrl": { "col": "G", "label": "お問い合わせURL" },
-      "instagram": { "col": "H", "label": "Instagram" },
-      "tiktok": { "col": "I", "label": "TikTok" },
-      "location": { "col": "J", "label": "所在地" },
-      "sendApproval": { "col": "K", "label": "送信可否" },
-      "sentDate": { "col": "L", "label": "送付日" },
-      "status": { "col": "M", "label": "進行" },
-      "reply": { "col": "N", "label": "返信" },
-      "memo": { "col": "O", "label": "備考" },
-      "leadScore": { "col": "P", "label": "LeadScore" },
-      "timeRexUrl": { "col": "Q", "label": "MeetingURL" },
-      "sendCount": { "col": "R", "label": "SendCount" },
-      "googleMapsUrl": { "col": "S", "label": "Google Maps URL" }
-    },
     "approvalValue": "○"
   },
   "crawler": {

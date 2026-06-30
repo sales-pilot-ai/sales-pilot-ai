@@ -1,47 +1,81 @@
 import { settings } from '../config/index.js';
 
-const COLUMNS = settings.sheets.columns;
-
-/**
- * 列定義をアルファベット順にソートしたフィールド名配列（A→P 順）
- * @type {string[]}
- */
-export const COLUMN_FIELDS = Object.entries(COLUMNS)
-  .sort(([, a], [, b]) => a.col.localeCompare(b.col))
-  .map(([field]) => field);
-
-/** シートの読み書き範囲（例: "A:P"）*/
-export const SHEET_RANGE = `A:${COLUMNS[COLUMN_FIELDS[COLUMN_FIELDS.length - 1]].col}`;
-
 /** 送信可否の承認値 */
 export const APPROVAL_VALUE = settings.sheets.approvalValue;
 
-/** 行1がヘッダーかどうか */
-export const HEADER_ROW = settings.sheets.headerRow ?? false;
+/**
+ * シートの日本語ヘッダー名 → Company フィールド名 のマッピング。
+ * ヘッダーがこの表に含まれない列は読み書き時にスキップされる。
+ */
+export const HEADER_TO_FIELD = Object.freeze({
+  会社名: 'companyName',
+  業種: 'industry',
+  エリア: 'area',
+  ホームページ: 'websiteUrl',
+  メールアドレス: 'email',
+  お問い合わせフォーム: 'contactFormUrl',
+  電話番号: 'phone',
+  住所: 'location',
+  メモ: 'memo',
+  送信日: 'sentDate',
+  送信可否: 'sendApproval',
+  送信状況: 'status',
+  担当者名: 'contactName',
+  最終更新: 'updatedAt',
+});
 
 /**
- * Company オブジェクトをシート行の配列に変換する。
+ * Company フィールド名 → シートの日本語ヘッダー名 のマッピング。
+ */
+export const FIELD_TO_HEADER = Object.freeze(
+  Object.fromEntries(Object.entries(HEADER_TO_FIELD).map(([h, f]) => [f, h]))
+);
+
+/**
+ * 0-based 列インデックスをアルファベット列名に変換する。
+ * 例: 0→'A', 25→'Z', 26→'AA'
+ * @param {number} idx  0-based 列インデックス
+ * @returns {string}
+ */
+export function colIndexToLetter(idx) {
+  let s = '';
+  let n = idx + 1;
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    s = String.fromCharCode(65 + rem) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+/**
+ * シートの実際のヘッダー行に基づいて Company を行配列に変換する。
+ * ヘッダーに対応するフィールドがない列は空文字になる。
  * @param {import('../models/company.js').Company} company
+ * @param {string[]} headers  シート 1 行目のヘッダー配列
  * @returns {string[]}
  */
-export function companyToRow(company) {
-  return COLUMN_FIELDS.map((field) => {
+export function companyToRowByHeaders(company, headers) {
+  return headers.map((header) => {
+    const field = HEADER_TO_FIELD[header];
+    if (!field) return '';
     const val = company[field];
-    if (val === null || val === undefined) return '';
-    return String(val);
+    return val === null || val === undefined ? '' : String(val);
   });
 }
 
 /**
- * シート行の配列を Company 相当のオブジェクトに変換する。
- * シートに存在しないフィールドは含まれない。
+ * シート行の配列をヘッダーに基づいて Company 相当のオブジェクトに変換する。
+ * ヘッダーに対応するフィールドがない列は無視される。
  * @param {string[]} row
+ * @param {string[]} headers  シート 1 行目のヘッダー配列
  * @returns {Record<string, string>}
  */
-export function rowToCompany(row) {
+export function rowToCompanyByHeaders(row, headers) {
   const obj = {};
-  COLUMN_FIELDS.forEach((field, i) => {
-    obj[field] = row[i] ?? '';
+  headers.forEach((header, i) => {
+    const field = HEADER_TO_FIELD[header];
+    if (field) obj[field] = row[i] ?? '';
   });
   return obj;
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { program } from 'commander';
+import { authCommand } from './commands/auth.js';
 import { configCommand } from './commands/config.js';
 import { findCommand } from './commands/find.js';
 import { sendCommand } from './commands/send.js';
@@ -11,6 +12,11 @@ program
   .name('sales-pilot')
   .description('営業リストの作成からメール送信までを半自動化するツール')
   .version('0.1.0');
+
+program
+  .command('auth')
+  .description('Google OAuth2 認証を実行してトークンを取得する（Gmail 送信に必要）')
+  .action(authCommand);
 
 program
   .command('config')
@@ -25,6 +31,7 @@ program
   .option('-l, --limit <件数>', '最大取得件数', '20')
   .option('--skip-analyzer', 'WebsiteAnalyzer をスキップする', false)
   .option('--dry-run', 'スプレッドシートへの保存をスキップする', false)
+  .option('-y, --yes', '確認プロンプトをスキップして即実行する', false)
   .action(findCommand);
 
 program
