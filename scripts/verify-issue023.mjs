@@ -45,7 +45,11 @@ const approvedCompanies = dataRows
 console.log(`シート取得完了: ${dataRows.length}行 / 送信可否○: ${approvedCompanies.length}件\n`);
 
 // ── email-builder と send-preview を直接インポートして検証 ─────────────────
-import { buildEmailContent, loadEmailTemplates, buildTextSignature } from '../src/cli/commands/email-builder.js';
+import {
+  buildEmailContent,
+  loadEmailTemplates,
+  buildTextSignature,
+} from '../src/cli/commands/email-builder.js';
 import { buildPreviewItems, renderPreview } from '../src/cli/commands/send-preview.js';
 
 let pass = 0;
@@ -71,8 +75,14 @@ console.log('\n=== T-02: loadEmailTemplates ===');
 let templates;
 try {
   templates = loadEmailTemplates('initial_contact');
-  check('textTemplate を読み込んだ', typeof templates.textTemplate === 'string' && templates.textTemplate.length > 0);
-  check('htmlTemplate を読み込んだ（または null）', templates.htmlTemplate === null || typeof templates.htmlTemplate === 'string');
+  check(
+    'textTemplate を読み込んだ',
+    typeof templates.textTemplate === 'string' && templates.textTemplate.length > 0
+  );
+  check(
+    'htmlTemplate を読み込んだ（または null）',
+    templates.htmlTemplate === null || typeof templates.htmlTemplate === 'string'
+  );
 } catch (e) {
   check('loadEmailTemplates 失敗', false, e.message);
   process.exit(1);
@@ -90,7 +100,11 @@ const testCompany = {
 };
 
 const content = await buildEmailContent(testCompany, templates);
-check('subject が文字列', typeof content.subject === 'string' && content.subject.length > 0, content.subject);
+check(
+  'subject が文字列',
+  typeof content.subject === 'string' && content.subject.length > 0,
+  content.subject
+);
 check('textBody が文字列', typeof content.textBody === 'string' && content.textBody.length > 0);
 check('textBody に署名を含む', content.textBody.includes('--'));
 
@@ -126,7 +140,10 @@ check('スキップ理由 "送信済" が出力に含まれる', output.includes
 if (approvedCompanies.length > 0) {
   console.log('\n=== T-06: 実際の承認済み企業でのプレビュー表示 ===');
   console.log('--- プレビュー表示（送信はしません） ---');
-  const { targets: realTargets, skips: realSkips } = await buildPreviewItems(approvedCompanies, templates);
+  const { targets: realTargets, skips: realSkips } = await buildPreviewItems(
+    approvedCompanies,
+    templates
+  );
   renderPreview(realTargets, realSkips);
   check(
     '実際の承認済み企業でプレビューが生成された',

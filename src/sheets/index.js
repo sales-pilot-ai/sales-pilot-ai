@@ -4,6 +4,12 @@ import { SheetsService } from './service.js';
 
 export { SheetsService };
 export { createAuth, getOAuthAuthUrl, saveOAuthToken } from './auth.js';
+export {
+  SendHistoryService,
+  createSendHistoryService,
+  SEND_RESULT,
+  generateBatchId,
+} from './send-history.js';
 
 /**
  * 認証済みの SheetsService インスタンスを生成する。

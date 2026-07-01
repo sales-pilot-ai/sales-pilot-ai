@@ -1,4 +1,10 @@
-import { getApprovedRows, updateStatus } from '../../sheets/index.js';
+import {
+  getApprovedRows,
+  updateStatus,
+  createSendHistoryService,
+  SEND_RESULT,
+  generateBatchId,
+} from '../../sheets/index.js';
 import { createMailer } from '../../gmail/index.js';
 import { loadEmailTemplates, buildEmailContent } from './email-builder.js';
 import { shouldSkip } from './send-filter.js';
@@ -6,6 +12,9 @@ import { runPreview } from './send-preview.js';
 import { SEND_STATUS } from '../../constants/index.js';
 import { env } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
+
+const TEMPLATE_NAME = 'initial_contact';
+const SCENARIO_NAME = '初回営業';
 
 /**
  * @param {{ dryRun?: boolean, force?: boolean, preview?: boolean }} options
@@ -29,7 +38,7 @@ export async function sendCommand(options) {
       return;
     }
 
-    const templates = loadEmailTemplates('initial_contact');
+    const templates = loadEmailTemplates(TEMPLATE_NAME);
 
     if (preview) {
       const confirmed = await runPreview(companies, templates, { force });
@@ -40,13 +49,34 @@ export async function sendCommand(options) {
       console.log('');
     }
 
+    const batchId = generateBatchId();
     const mailer = dryRun ? null : await createMailer();
+    const sendHistory = dryRun ? null : await createSendHistoryService();
+    if (sendHistory) await sendHistory.ensureSheet();
 
     for (const company of companies) {
       const { skip, reason } = shouldSkip(company, { force });
 
       if (skip) {
         logger.info(`[スキップ] ${company.companyName} (${reason})`);
+
+        if (sendHistory) {
+          await sendHistory
+            .log({
+              sentAt: new Date().toISOString(),
+              batchId,
+              company,
+              subject: '',
+              messageId: '',
+              result: SEND_RESULT.SKIPPED,
+              error: reason,
+              sender: env.gmailFrom,
+              templateName: TEMPLATE_NAME,
+              scenarioName: SCENARIO_NAME,
+            })
+            .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
+        }
+
         counts.skipped++;
         continue;
       }
@@ -79,15 +109,47 @@ export async function sendCommand(options) {
           { expectedCompanyId: company.companyId }
         );
 
+        await sendHistory
+          .log({
+            sentAt: new Date().toISOString(),
+            batchId,
+            company,
+            subject,
+            messageId,
+            result: SEND_RESULT.SUCCESS,
+            error: '',
+            sender: env.gmailFrom,
+            templateName: TEMPLATE_NAME,
+            scenarioName: SCENARIO_NAME,
+          })
+          .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
+
         logger.success(`送信完了: ${company.companyName} (${company.email}) [${messageId}]`);
         counts.sent++;
       } catch (err) {
         logger.error(`送信失敗: ${company.companyName} (${company.email}): ${err.message}`);
+
         await updateStatus(
           company._rowIndex,
           { status: SEND_STATUS.FAILED },
           { expectedCompanyId: company.companyId }
         ).catch((e) => logger.warn(`[Sheets] ステータス更新失敗: ${e.message}`));
+
+        await sendHistory
+          .log({
+            sentAt: new Date().toISOString(),
+            batchId,
+            company,
+            subject,
+            messageId: '',
+            result: SEND_RESULT.FAILED,
+            error: err.message,
+            sender: env.gmailFrom,
+            templateName: TEMPLATE_NAME,
+            scenarioName: SCENARIO_NAME,
+          })
+          .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
+
         counts.failed++;
       }
 
