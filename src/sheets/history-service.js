@@ -57,6 +57,24 @@ export class HistoryService {
   }
 
   /**
+   * タブの全データ行を返す（ヘッダー行を除く）。
+   * タブが存在しない場合は空配列を返す（エラーにしない）。
+   * @returns {Promise<string[][]>}
+   */
+  async getRows() {
+    try {
+      const res = await this._api.spreadsheets.values.get({
+        spreadsheetId: this._spreadsheetId,
+        range: `'${this._sheetName}'!A:ZZ`,
+      });
+      const allRows = res.data.values ?? [];
+      return allRows.length > 1 ? allRows.slice(1) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * 1行を末尾に追記する。未初期化の場合は ensureSheet() を先に呼ぶ。
    * @param {(string | number)[]} values
    */

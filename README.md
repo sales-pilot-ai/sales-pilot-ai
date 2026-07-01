@@ -120,6 +120,25 @@ GOOGLE_CLIENT_SECRET=（JSON の client_secret）
 
 > `credentials/` ディレクトリは `.gitignore` に含まれており、Git にコミットされません。
 
+#### OAuth 再認証手順（スコープ追加時）
+
+Gmail の読み取り権限（`gmail.readonly`）が追加されたため、初めて `check-replies` を使う場合は再認証が必要です。
+
+```bash
+# 既存トークンを削除
+rm credentials/oauth-token.json
+
+# 再認証を実行
+sales-pilot auth
+
+# ブラウザで Google アカウントにログインし
+# 「Gmail のメールの読み取り」権限を許可する
+```
+
+> 追加されたスコープ: `gmail.readonly`（返信メールの読み取り専用。送信・削除は行いません）
+
+---
+
 #### 2-3. Google Sheets をサービスアカウントと共有（サービスアカウント認証の場合）
 
 `GOOGLE_AUTH_TYPE=service_account` を使う場合は、以下も行います。
@@ -252,6 +271,30 @@ sales-pilot send --force
 ```
 完了 — 送信: 5件  スキップ: 3件  失敗: 1件
 ```
+
+---
+
+### `sales-pilot check-replies` — 返信を検知して状態を更新
+
+Gmail のスレッドを確認し、営業メールへの返信を自動検知します。
+
+- 返信が見つかった企業の営業リストのステータスを「返信あり」に更新
+- 「返信履歴」タブ（初回実行時に自動作成）に返信内容を記録
+
+```bash
+# 返信を検知して営業リストを更新
+sales-pilot check-replies
+
+# 確認のみ（実際には更新しない）
+sales-pilot check-replies --dry-run
+```
+
+| オプション  | 説明                                         |
+| ----------- | -------------------------------------------- |
+| `--dry-run` | Gmail API を呼ばず、確認対象企業の一覧を表示 |
+
+> **前提**: `gmail.readonly` スコープを含む OAuth トークンが必要です。  
+> 初回利用時は「OAuth 再認証手順」を実施してください。
 
 ---
 

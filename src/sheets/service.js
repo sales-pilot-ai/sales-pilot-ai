@@ -354,6 +354,54 @@ export class SheetsService {
   }
 
   /**
+   * 全企業行を返す（企業ID が空の行を除く）。
+   * check-replies など、送信可否にかかわらず全企業のステータスを参照したい場合に使う。
+   * @returns {Promise<Array<Record<string, string> & { _rowIndex: number }>>}
+   */
+  async getAllCompanies() {
+    const spreadsheetId = this._requireSpreadsheetId();
+    this._headerCache = null;
+
+    const res = await this._api.spreadsheets.values.get({
+      spreadsheetId,
+      range: this._sheetName,
+    });
+
+    const allRows = res.data.values ?? [];
+    if (!allRows.length) return [];
+
+    const headers = allRows[0].map(String);
+    this._headerCache = this._buildHeaderCache(headers);
+    const { fieldToColIndex } = this._headerCache;
+    const companyIdColIndex = fieldToColIndex.get('companyId') ?? -1;
+
+    return allRows
+      .slice(1)
+      .map((row, i) => ({
+        ...rowToCompanyByHeaders(row, headers),
+        _rowIndex: i + 2,
+      }))
+      .filter((c) => companyIdColIndex < 0 || (c.companyId ?? '') !== '');
+  }
+
+  /**
+   * companyId を指定して営業リストの行を更新する。
+   * 行番号を知らなくても companyId だけで更新できる公開メソッド。
+   * @param {string} companyId  例: 'C000001'
+   * @param {Record<string, string | number | null>} values
+   * @returns {Promise<object | null>}
+   */
+  async updateCompanyByCompanyId(companyId, values) {
+    const spreadsheetId = this._requireSpreadsheetId();
+    const rowIndex = await this._findRowByCompanyId(spreadsheetId, companyId);
+    if (rowIndex === null) {
+      logger.warn(`[Sheets] companyId ${companyId} が見つかりません`);
+      return null;
+    }
+    return this.updateStatus(rowIndex, values);
+  }
+
+  /**
    * 送信可否が「○」の行を取得して返す。
    * 1 行目はヘッダーとして扱い、返り値オブジェクトには _rowIndex（1 始まり行番号）が付与される。
    * @returns {Promise<Array<Record<string, string> & { _rowIndex: number }>>}

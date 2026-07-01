@@ -43,6 +43,7 @@ function makeSheetsApi({ sheetTitles = [] } = {}) {
       values: {
         update: vi.fn().mockResolvedValue({}),
         append: vi.fn().mockResolvedValue({}),
+        get: vi.fn().mockResolvedValue({ data: { values: [] } }),
       },
     },
   };
@@ -211,6 +212,80 @@ describe('HistoryService', () => {
 
       const req = api.spreadsheets.values.append.mock.calls[0][0];
       expect(req.valueInputOption).toBe('RAW');
+    });
+  });
+
+  describe('getRows', () => {
+    it('ヘッダー行を除いたデータ行を返す', async () => {
+      const api = makeSheetsApi({ sheetTitles: ['送信履歴'] });
+      api.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            ['送信日時', 'Batch ID'], // ヘッダー行
+            ['2026-07-01', 'BATCH-001'],
+            ['2026-07-02', 'BATCH-002'],
+          ],
+        },
+      });
+      const svc = new HistoryService({
+        sheetsApi: api,
+        spreadsheetId: 'sp-id',
+        sheetName: '送信履歴',
+        headers: ['送信日時', 'Batch ID'],
+      });
+
+      const rows = await svc.getRows();
+
+      expect(rows).toHaveLength(2);
+      expect(rows[0][0]).toBe('2026-07-01');
+      expect(rows[1][0]).toBe('2026-07-02');
+    });
+
+    it('データ行がない場合（ヘッダーのみ）は空配列を返す', async () => {
+      const api = makeSheetsApi({ sheetTitles: ['送信履歴'] });
+      api.spreadsheets.values.get.mockResolvedValue({
+        data: { values: [['送信日時', 'Batch ID']] },
+      });
+      const svc = new HistoryService({
+        sheetsApi: api,
+        spreadsheetId: 'sp-id',
+        sheetName: '送信履歴',
+        headers: [],
+      });
+
+      const rows = await svc.getRows();
+
+      expect(rows).toEqual([]);
+    });
+
+    it('シートが存在しない場合（API エラー）は空配列を返す', async () => {
+      const api = makeSheetsApi({ sheetTitles: [] });
+      api.spreadsheets.values.get.mockRejectedValue(new Error('Sheet not found'));
+      const svc = new HistoryService({
+        sheetsApi: api,
+        spreadsheetId: 'sp-id',
+        sheetName: '存在しないシート',
+        headers: [],
+      });
+
+      const rows = await svc.getRows();
+
+      expect(rows).toEqual([]);
+    });
+
+    it('values が空の場合は空配列を返す', async () => {
+      const api = makeSheetsApi({ sheetTitles: ['送信履歴'] });
+      api.spreadsheets.values.get.mockResolvedValue({ data: { values: [] } });
+      const svc = new HistoryService({
+        sheetsApi: api,
+        spreadsheetId: 'sp-id',
+        sheetName: '送信履歴',
+        headers: [],
+      });
+
+      const rows = await svc.getRows();
+
+      expect(rows).toEqual([]);
     });
   });
 });
@@ -411,6 +486,91 @@ describe('SendHistoryService', () => {
 
       const [row] = spy.mock.calls[0];
       expect(row).toHaveLength(SEND_HISTORY_HEADERS.length);
+    });
+  });
+
+  describe('getSuccessRows', () => {
+    function makeRawRow(overrides = {}) {
+      // SEND_HISTORY_HEADERS 順の生配列を作る
+      const base = [
+        '2026-07-01T10:00:00.000Z', // 0: 送信日時
+        '20260701100000-ABCD', // 1: Batch ID
+        'C000001', // 2: 企業ID
+        'ChIJtest', // 3: Place ID
+        '株式会社テスト', // 4: 会社名
+        'test@example.co.jp', // 5: メールアドレス
+        'テスト件名', // 6: 件名
+        'msg-001', // 7: Message ID
+        'SUCCESS', // 8: 送信結果
+        '', // 9: エラー内容
+        'sender@example.com', // 10: 送信者
+        'initial_contact', // 11: Template Name
+        '初回営業', // 12: Scenario Name
+        'v0.9.0', // 13: Sales Pilot Version
+      ];
+      if (overrides.result !== undefined) base[8] = overrides.result;
+      if (overrides.companyId !== undefined) base[2] = overrides.companyId;
+      if (overrides.messageId !== undefined) base[7] = overrides.messageId;
+      if (overrides.sentAt !== undefined) base[0] = overrides.sentAt;
+      return base;
+    }
+
+    it('SUCCESS 行だけを返す', async () => {
+      api.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            SEND_HISTORY_HEADERS, // ヘッダー行（getRows が除外）
+            makeRawRow({ result: 'SUCCESS' }),
+            makeRawRow({ result: 'FAILED' }),
+            makeRawRow({ result: 'SKIPPED' }),
+          ],
+        },
+      });
+
+      const rows = await svc.getSuccessRows();
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].messageId).toBe('msg-001');
+    });
+
+    it('companyId または messageId が空の行を除外する', async () => {
+      api.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [
+            SEND_HISTORY_HEADERS,
+            makeRawRow({ result: 'SUCCESS', companyId: '' }),
+            makeRawRow({ result: 'SUCCESS', messageId: '' }),
+            makeRawRow({ result: 'SUCCESS' }),
+          ],
+        },
+      });
+
+      const rows = await svc.getSuccessRows();
+
+      expect(rows).toHaveLength(1);
+    });
+
+    it('返すオブジェクトに sentAt・companyId・messageId・email が含まれる', async () => {
+      api.spreadsheets.values.get.mockResolvedValue({
+        data: {
+          values: [SEND_HISTORY_HEADERS, makeRawRow({ sentAt: '2026-07-01T10:00:00.000Z' })],
+        },
+      });
+
+      const rows = await svc.getSuccessRows();
+
+      expect(rows[0].sentAt).toBe('2026-07-01T10:00:00.000Z');
+      expect(rows[0].companyId).toBe('C000001');
+      expect(rows[0].email).toBe('test@example.co.jp');
+      expect(rows[0].messageId).toBe('msg-001');
+    });
+
+    it('送信履歴が空の場合は空配列を返す', async () => {
+      api.spreadsheets.values.get.mockResolvedValue({ data: { values: [] } });
+
+      const rows = await svc.getSuccessRows();
+
+      expect(rows).toEqual([]);
     });
   });
 });

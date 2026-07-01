@@ -10,6 +10,12 @@ export {
   SEND_RESULT,
   generateBatchId,
 } from './send-history.js';
+export {
+  ReplyHistoryService,
+  createReplyHistoryService,
+  REPLY_HISTORY_SHEET,
+  REPLY_HISTORY_HEADERS,
+} from './reply-history.js';
 
 /**
  * 認証済みの SheetsService インスタンスを生成する。

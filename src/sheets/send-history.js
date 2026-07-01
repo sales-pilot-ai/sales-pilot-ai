@@ -126,6 +126,27 @@ export class SendHistoryService extends HistoryService {
       appVersion,
     ]);
   }
+
+  /**
+   * 送信結果が SUCCESS の行をオブジェクト配列で返す。
+   * companyId と messageId が揃っていない行は除外する。
+   * @returns {Promise<Array<{ sentAt: string, companyId: string, placeId: string, companyName: string, email: string, messageId: string }>>}
+   */
+  async getSuccessRows() {
+    const resultIdx = SEND_HISTORY_HEADERS.indexOf('送信結果');
+    const rows = await this.getRows();
+    return rows
+      .filter((row) => (row[resultIdx] ?? '') === SEND_RESULT.SUCCESS)
+      .map((row) => ({
+        sentAt: row[0] ?? '',
+        companyId: row[2] ?? '',
+        placeId: row[3] ?? '',
+        companyName: row[4] ?? '',
+        email: row[5] ?? '',
+        messageId: row[7] ?? '',
+      }))
+      .filter((r) => r.companyId && r.messageId);
+  }
 }
 
 /**

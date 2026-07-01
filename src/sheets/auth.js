@@ -5,6 +5,7 @@ import { google } from 'googleapis';
 export const OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets',
   'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/gmail.readonly',
 ];
 
 // サービスアカウントは Sheets のみ（Gmail は domain-wide delegation が必要なため）

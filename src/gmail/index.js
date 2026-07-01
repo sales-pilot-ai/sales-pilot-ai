@@ -3,6 +3,7 @@ import { createAuth } from '../sheets/auth.js';
 import { GmailMailer } from './mailer.js';
 
 export { GmailMailer };
+export { GmailReader, createGmailReader } from './reader.js';
 export { loadTemplate, renderTemplate, renderTemplateFile } from './template.js';
 
 /**
