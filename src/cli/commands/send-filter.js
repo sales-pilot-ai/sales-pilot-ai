@@ -18,6 +18,10 @@ const SKIP_WITHOUT_FORCE = new Set([SEND_STATUS.SENT]);
  * @returns {{ skip: boolean, reason?: string }}
  */
 export function shouldSkip(company, { force = false } = {}) {
+  if (!company.email || !company.email.trim()) {
+    return { skip: true, reason: 'メールなし' };
+  }
+
   const status = company.status ?? '';
 
   if (ALWAYS_SKIP.has(status)) {

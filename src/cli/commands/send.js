@@ -1,49 +1,19 @@
-import { existsSync } from 'fs';
-import { resolve, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { getApprovedRows, updateStatus } from '../../sheets/index.js';
-import { createMailer, loadTemplate, renderTemplate } from '../../gmail/index.js';
-import { createPersonalizedContent } from '../../personalizer/index.js';
+import { createMailer } from '../../gmail/index.js';
+import { loadEmailTemplates, buildEmailContent } from './email-builder.js';
 import { shouldSkip } from './send-filter.js';
+import { runPreview } from './send-preview.js';
 import { SEND_STATUS } from '../../constants/index.js';
 import { env } from '../../config/index.js';
 import { logger } from '../../utils/logger.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const TEMPLATES_DIR = resolve(__dirname, '../../../templates/emails');
-
-function loadEmailTemplates(name) {
-  const txtPath = resolve(TEMPLATES_DIR, `${name}.txt`);
-  const htmlPath = resolve(TEMPLATES_DIR, `${name}.html`);
-  const subjectPath = resolve(TEMPLATES_DIR, `${name}.subject.txt`);
-  return {
-    textTemplate: loadTemplate(txtPath),
-    htmlTemplate: existsSync(htmlPath) ? loadTemplate(htmlPath) : null,
-    subjectTemplate: existsSync(subjectPath) ? loadTemplate(subjectPath).trim() : null,
-  };
-}
-
-function buildTextSignature() {
-  const parts = ['--'];
-  if (env.gmailName) parts.push(env.gmailName);
-  if (env.gmailFrom) parts.push(env.gmailFrom);
-  return parts.join('\n');
-}
-
-function buildHtmlSignature() {
-  const lines = [];
-  if (env.gmailName) lines.push(`<strong>${env.gmailName}</strong>`);
-  if (env.gmailFrom) lines.push(`<a href="mailto:${env.gmailFrom}">${env.gmailFrom}</a>`);
-  if (!lines.length) return '';
-  return `<div style="border-top:1px solid #e0e0e0;margin-top:24px;padding-top:16px;font-size:12px;color:#666;">${lines.join('<br />')}</div>`;
-}
-
 /**
- * @param {{ dryRun?: boolean, force?: boolean }} options
+ * @param {{ dryRun?: boolean, force?: boolean, preview?: boolean }} options
  */
 export async function sendCommand(options) {
   const dryRun = options.dryRun ?? env.isDryRun;
   const force = options.force ?? false;
+  const preview = options.preview ?? false;
 
   if (dryRun) logger.warn('DRY RUNモード: メールは実際には送信されません');
   if (force) logger.warn('--force モード: 送信済企業にも送信します');
@@ -59,7 +29,17 @@ export async function sendCommand(options) {
       return;
     }
 
-    const { textTemplate, htmlTemplate, subjectTemplate } = loadEmailTemplates('initial_contact');
+    const templates = loadEmailTemplates('initial_contact');
+
+    if (preview) {
+      const confirmed = await runPreview(companies, templates, { force });
+      if (!confirmed) {
+        logger.info('送信をキャンセルしました');
+        return;
+      }
+      console.log('');
+    }
+
     const mailer = dryRun ? null : await createMailer();
 
     for (const company of companies) {
@@ -71,22 +51,7 @@ export async function sendCommand(options) {
         continue;
       }
 
-      const { introText } = await createPersonalizedContent(company);
-      const vars = {
-        companyName: company.companyName,
-        contactName: company.contactName || 'ご担当者',
-        meetingUrl: env.meetingUrl,
-        introText,
-      };
-
-      const subject = subjectTemplate
-        ? renderTemplate(subjectTemplate, vars)
-        : `【ご提案】${company.companyName} 様の営業効率化についてのご相談`;
-
-      const textBody = renderTemplate(textTemplate, vars) + '\n' + buildTextSignature();
-      const htmlBody = htmlTemplate
-        ? renderTemplate(htmlTemplate, vars).replace('</body>', `${buildHtmlSignature()}</body>`)
-        : undefined;
+      const { subject, textBody, htmlBody } = await buildEmailContent(company, templates);
 
       if (dryRun) {
         logger.warn(`[DRY RUN] To: ${company.email}`);

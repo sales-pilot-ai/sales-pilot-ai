@@ -3,10 +3,36 @@ import { shouldSkip } from './send-filter.js';
 import { SEND_STATUS } from '../../constants/index.js';
 
 function company(status) {
-  return { status };
+  return { email: 'test@example.com', status };
 }
 
 describe('shouldSkip', () => {
+  // ─── メールなし ──────────────────────────────────────────────────────────────
+
+  it('email が空文字のときスキップする', () => {
+    const result = shouldSkip({ email: '' });
+    expect(result.skip).toBe(true);
+    expect(result.reason).toBe('メールなし');
+  });
+
+  it('email が undefined のときスキップする', () => {
+    const result = shouldSkip({});
+    expect(result.skip).toBe(true);
+    expect(result.reason).toBe('メールなし');
+  });
+
+  it('email がスペースのみのときスキップする', () => {
+    const result = shouldSkip({ email: '   ' });
+    expect(result.skip).toBe(true);
+    expect(result.reason).toBe('メールなし');
+  });
+
+  it('force=true でもメールなしはスキップする', () => {
+    const result = shouldSkip({ email: '' }, { force: true });
+    expect(result.skip).toBe(true);
+    expect(result.reason).toBe('メールなし');
+  });
+
   // ─── 未送信 ─────────────────────────────────────────────────────────────────
 
   it('未送信はスキップしない', () => {
@@ -18,7 +44,7 @@ describe('shouldSkip', () => {
   });
 
   it('status が undefined はスキップしない（未送信扱い）', () => {
-    expect(shouldSkip({}).skip).toBe(false);
+    expect(shouldSkip({ email: 'test@example.com' }).skip).toBe(false);
   });
 
   // ─── 送信失敗（再送対象）───────────────────────────────────────────────────

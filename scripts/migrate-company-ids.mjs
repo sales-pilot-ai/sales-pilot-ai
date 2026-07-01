@@ -39,13 +39,19 @@ const res = await sheetsApi.spreadsheets.values.get({
   range: process.env.SHEET_NAME || '営業リスト',
 });
 const allRows = res.data.values ?? [];
-if (!allRows.length) { console.log('シートが空です'); process.exit(0); }
+if (!allRows.length) {
+  console.log('シートが空です');
+  process.exit(0);
+}
 
 const headers = allRows[0].map(String);
 const companyIdIdx = headers.indexOf('企業ID');
 const nameIdx = headers.indexOf('会社名');
 
-if (companyIdIdx < 0) { console.log('企業ID 列が見つかりません'); process.exit(1); }
+if (companyIdIdx < 0) {
+  console.log('企業ID 列が見つかりません');
+  process.exit(1);
+}
 
 // ヘッダーキャッシュを service に設定（updateStatus が使えるように）
 service._headerCache = service._buildHeaderCache(headers);

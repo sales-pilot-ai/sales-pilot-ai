@@ -37,6 +37,7 @@ program
 program
   .command('send')
   .description('送信可否が○の企業にメールを送信する')
+  .option('-p, --preview', '送信前に内容を確認する画面を表示する')
   .option('--dry-run', '実際には送信せず内容を確認のみ')
   .option('--force', '送信済企業にも強制送信する')
   .action(sendCommand);
