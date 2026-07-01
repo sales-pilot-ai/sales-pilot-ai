@@ -39,11 +39,14 @@ import {
   APP_VERSION,
   generateBatchId,
 } from '../src/sheets/send-history.js';
-import { HistoryService } from '../src/sheets/history-service.js';
 
 // ── T-01: 定数・型チェック ───────────────────────────────────────────────
 console.log('=== T-01: 定数チェック ===');
-check('SEND_HISTORY_HEADERS が 14列', SEND_HISTORY_HEADERS.length === 14, `${SEND_HISTORY_HEADERS.length}列`);
+check(
+  'SEND_HISTORY_HEADERS が 14列',
+  SEND_HISTORY_HEADERS.length === 14,
+  `${SEND_HISTORY_HEADERS.length}列`
+);
 check('SEND_RESULT.SUCCESS === "SUCCESS"', SEND_RESULT.SUCCESS === 'SUCCESS');
 check('SEND_RESULT.FAILED === "FAILED"', SEND_RESULT.FAILED === 'FAILED');
 check('SEND_RESULT.SKIPPED === "SKIPPED"', SEND_RESULT.SKIPPED === 'SKIPPED');
@@ -167,8 +170,16 @@ const versionIdx = SEND_HISTORY_HEADERS.indexOf('Sales Pilot Version');
 check('SUCCESS 行の送信結果', successRow[resultIdx] === 'SUCCESS', successRow[resultIdx]);
 check('SKIPPED 行の送信結果', skippedRow[resultIdx] === 'SKIPPED', skippedRow[resultIdx]);
 check('Batch ID が一致', successRow[batchIdIdx] === batchId, batchId);
-check('SKIPPED 行のエラー内容にスキップ理由', skippedRow[errorIdx] === 'メールなし', skippedRow[errorIdx]);
-check('Sales Pilot Version が記録された', successRow[versionIdx] === 'v0.0.0-test', successRow[versionIdx]);
+check(
+  'SKIPPED 行のエラー内容にスキップ理由',
+  skippedRow[errorIdx] === 'メールなし',
+  skippedRow[errorIdx]
+);
+check(
+  'Sales Pilot Version が記録された',
+  successRow[versionIdx] === 'v0.0.0-test',
+  successRow[versionIdx]
+);
 
 // ── T-06: ensureSheet 2回目呼び出しで重複作成しない ──────────────────
 console.log('\n=== T-06: ensureSheet 冪等性確認 ===');
@@ -179,7 +190,9 @@ const meta3 = await sheetsApi.spreadsheets.get({
   spreadsheetId,
   fields: 'sheets.properties.title',
 });
-const count = (meta3.data.sheets ?? []).filter((s) => s.properties.title === SEND_HISTORY_SHEET).length;
+const count = (meta3.data.sheets ?? []).filter(
+  (s) => s.properties.title === SEND_HISTORY_SHEET
+).length;
 check('送信履歴タブが 1つだけ存在', count === 1, `${count}タブ`);
 
 // ── 結果 ─────────────────────────────────────────────────────────────────

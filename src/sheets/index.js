@@ -16,6 +16,12 @@ export {
   REPLY_HISTORY_SHEET,
   REPLY_HISTORY_HEADERS,
 } from './reply-history.js';
+export {
+  DashboardService,
+  createDashboardService,
+  DASHBOARD_SHEET,
+  DASHBOARD_COLUMNS,
+} from './dashboard.js';
 
 /**
  * 認証済みの SheetsService インスタンスを生成する。

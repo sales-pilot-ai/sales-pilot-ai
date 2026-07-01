@@ -2,6 +2,7 @@ import {
   createSheetsService,
   createSendHistoryService,
   createReplyHistoryService,
+  createDashboardService,
 } from '../../sheets/index.js';
 import { createGmailReader } from '../../gmail/index.js';
 import { SEND_STATUS } from '../../constants/index.js';
@@ -111,6 +112,14 @@ export async function checkRepliesCommand(options = {}) {
     }
 
     logger.success(`[check-replies] 完了: ${replyCount}件の返信を検知しました`);
+
+    // 8. 営業ダッシュボードを更新（失敗しても check-replies 本体には影響しない）
+    try {
+      const dashboardService = await createDashboardService();
+      await dashboardService.createOrUpdateDashboard();
+    } catch (e) {
+      logger.warn(`[check-replies] ダッシュボードの更新をスキップしました: ${e.message}`);
+    }
   } catch (err) {
     logger.error(err.message);
     process.exit(1);

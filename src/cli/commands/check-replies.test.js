@@ -10,6 +10,7 @@ vi.mock('../../sheets/index.js', () => ({
   createSendHistoryService: vi.fn(),
   createSheetsService: vi.fn(),
   createReplyHistoryService: vi.fn(),
+  createDashboardService: vi.fn(),
 }));
 
 vi.mock('../../gmail/index.js', () => ({
@@ -23,6 +24,7 @@ import {
   createSendHistoryService,
   createSheetsService,
   createReplyHistoryService,
+  createDashboardService,
 } from '../../sheets/index.js';
 import { createGmailReader } from '../../gmail/index.js';
 
@@ -41,6 +43,9 @@ const mockGmailReader = {
 const mockReplyHistory = {
   ensureSheet: vi.fn(),
   log: vi.fn(),
+};
+const mockDashboardService = {
+  createOrUpdateDashboard: vi.fn(),
 };
 
 // ─── テストデータ ─────────────────────────────────────────────────────────────
@@ -77,6 +82,7 @@ beforeEach(() => {
   createSheetsService.mockResolvedValue(mockSheetsService);
   createGmailReader.mockResolvedValue(mockGmailReader);
   createReplyHistoryService.mockResolvedValue(mockReplyHistory);
+  createDashboardService.mockResolvedValue(mockDashboardService);
 
   mockSendHistory.getSuccessRows.mockResolvedValue([]);
   mockSheetsService.getAllCompanies.mockResolvedValue([]);
@@ -84,6 +90,7 @@ beforeEach(() => {
   mockGmailReader.findReplies.mockResolvedValue([]);
   mockReplyHistory.ensureSheet.mockResolvedValue(undefined);
   mockReplyHistory.log.mockResolvedValue(undefined);
+  mockDashboardService.createOrUpdateDashboard.mockResolvedValue(undefined);
 });
 
 // ─── テスト ───────────────────────────────────────────────────────────────────
@@ -261,6 +268,31 @@ describe('checkRepliesCommand', () => {
       await checkRepliesCommand({});
 
       expect(mockGmailReader.findReplies).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('ダッシュボード更新', () => {
+    it('処理完了後にダッシュボードを更新する', async () => {
+      mockSendHistory.getSuccessRows.mockResolvedValue([makeSuccessRow()]);
+      mockSheetsService.getAllCompanies.mockResolvedValue([
+        { companyId: 'C000001', status: '送信済' },
+      ]);
+      mockGmailReader.findReplies.mockResolvedValue([]);
+
+      await checkRepliesCommand({});
+
+      expect(mockDashboardService.createOrUpdateDashboard).toHaveBeenCalledTimes(1);
+    });
+
+    it('ダッシュボード更新エラーは無視して正常終了する', async () => {
+      mockSendHistory.getSuccessRows.mockResolvedValue([makeSuccessRow()]);
+      mockSheetsService.getAllCompanies.mockResolvedValue([
+        { companyId: 'C000001', status: '送信済' },
+      ]);
+      mockGmailReader.findReplies.mockResolvedValue([]);
+      mockDashboardService.createOrUpdateDashboard.mockRejectedValue(new Error('Sheets API error'));
+
+      await expect(checkRepliesCommand({})).resolves.not.toThrow();
     });
   });
 });

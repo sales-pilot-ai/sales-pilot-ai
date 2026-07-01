@@ -5,7 +5,6 @@
 import 'dotenv/config';
 import { readFileSync } from 'fs';
 import { google } from 'googleapis';
-import { createCompany } from '../src/models/company.js';
 import { SheetsService } from '../src/sheets/service.js';
 
 const oauthClient = JSON.parse(readFileSync('credentials/oauth-client.json', 'utf8'));
