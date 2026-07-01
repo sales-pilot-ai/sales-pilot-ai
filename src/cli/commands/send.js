@@ -104,17 +104,25 @@ export async function sendCommand(options) {
           htmlBody,
         });
 
-        await updateStatus(company._rowIndex, {
-          sentDate: new Date().toISOString().slice(0, 10),
-          status: SEND_STATUS.SENT,
-          sendCount: String((Number(company.sendCount) || 0) + 1),
-        });
+        await updateStatus(
+          company._rowIndex,
+          {
+            sentDate: new Date().toISOString().slice(0, 10),
+            status: SEND_STATUS.SENT,
+            sendCount: String((Number(company.sendCount) || 0) + 1),
+          },
+          { expectedCompanyId: company.companyId }
+        );
 
         logger.success(`送信完了: ${company.companyName} (${company.email}) [${messageId}]`);
         counts.sent++;
       } catch (err) {
         logger.error(`送信失敗: ${company.companyName} (${company.email}): ${err.message}`);
-        await updateStatus(company._rowIndex, { status: SEND_STATUS.FAILED }).catch(() => {});
+        await updateStatus(
+          company._rowIndex,
+          { status: SEND_STATUS.FAILED },
+          { expectedCompanyId: company.companyId }
+        ).catch((e) => logger.warn(`[Sheets] ステータス更新失敗: ${e.message}`));
         counts.failed++;
       }
 

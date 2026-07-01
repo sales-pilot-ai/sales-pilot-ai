@@ -40,6 +40,7 @@ export const FIELD_TO_HEADER = Object.freeze(
  * AI が自動更新できないフィールドの集合。
  * appendCompanies のマージ処理でのみ参照される。
  * send コマンドが updateStatus で送信状況を更新するのは許可される。
+ * companyId / placeId は一度採番・設定したら変更不可。
  */
 export const PROTECTED_FIELDS = Object.freeze(
   new Set([
@@ -51,6 +52,8 @@ export const PROTECTED_FIELDS = Object.freeze(
     'hasReply', // 返信有無
     'meetingDate', // 商談日
     'closed', // 成約
+    'companyId', // 企業ID（採番後は不変）
+    'placeId', // Place ID（設定後は不変）
   ])
 );
 
@@ -76,12 +79,44 @@ export function generateDedupKey(company) {
 }
 
 /**
- * 連番の整数値を 000001 形式の企業ID 文字列にフォーマットする。
+ * エンティティ種別ごとの ID プレフィックス。
+ * 将来の拡張（案件ID: 'D', 担当者ID: 'P' など）はここに追加する。
+ */
+export const ID_PREFIXES = Object.freeze({
+  company: 'C',
+  // deal:   'D',   // reserved
+  // person: 'P',   // reserved
+});
+
+/**
+ * プレフィックスと連番の整数値から ID 文字列を生成する汎用関数。
+ * @param {string} prefix  例: 'C'
+ * @param {number} n       1 以上の整数
+ * @returns {string}       例: 'C000001'
+ */
+export function formatId(prefix, n) {
+  return `${prefix}${String(n).padStart(6, '0')}`;
+}
+
+/**
+ * 連番の整数値を C000001 形式の企業ID 文字列にフォーマットする。
  * @param {number} n  1 以上の整数
  * @returns {string}
  */
 export function formatCompanyId(n) {
-  return String(n).padStart(6, '0');
+  return formatId(ID_PREFIXES.company, n);
+}
+
+/**
+ * C000001 形式の企業ID から連番部分の整数を取得する。
+ * 不正な形式の場合は null を返す。
+ * @param {string} id
+ * @returns {number | null}
+ */
+export function parseCompanyId(id) {
+  if (typeof id !== 'string') return null;
+  const match = id.match(/^C(\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 /**

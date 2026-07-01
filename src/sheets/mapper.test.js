@@ -4,11 +4,14 @@ import {
   FIELD_TO_HEADER,
   APPROVAL_VALUE,
   PROTECTED_FIELDS,
+  ID_PREFIXES,
   colIndexToLetter,
   companyToRowByHeaders,
   rowToCompanyByHeaders,
   generateDedupKey,
+  formatId,
   formatCompanyId,
+  parseCompanyId,
 } from './mapper.js';
 import { createCompany } from '../models/company.js';
 
@@ -36,6 +39,12 @@ const HEADERS = [
 ];
 
 // ─── HEADER_TO_FIELD ──────────────────────────────────────────────────────────
+
+describe('ID_PREFIXES', () => {
+  it('company キーを持つ', () => {
+    expect(ID_PREFIXES.company).toBe('C');
+  });
+});
 
 describe('HEADER_TO_FIELD', () => {
   it('19 個のマッピングを持つ', () => {
@@ -185,8 +194,8 @@ describe('rowToCompanyByHeaders', () => {
 // ─── PROTECTED_FIELDS ─────────────────────────────────────────────────────────
 
 describe('PROTECTED_FIELDS', () => {
-  it('8 個の保護フィールドを持つ', () => {
-    expect(PROTECTED_FIELDS.size).toBe(8);
+  it('10 個の保護フィールドを持つ', () => {
+    expect(PROTECTED_FIELDS.size).toBe(10);
   });
 
   it('送信可否・送信状況・送信日 が含まれる', () => {
@@ -204,6 +213,11 @@ describe('PROTECTED_FIELDS', () => {
     expect(PROTECTED_FIELDS.has('hasReply')).toBe(true);
     expect(PROTECTED_FIELDS.has('meetingDate')).toBe(true);
     expect(PROTECTED_FIELDS.has('closed')).toBe(true);
+  });
+
+  it('companyId・placeId が含まれる（採番後は不変）', () => {
+    expect(PROTECTED_FIELDS.has('companyId')).toBe(true);
+    expect(PROTECTED_FIELDS.has('placeId')).toBe(true);
   });
 
   it('会社名・ホームページ は含まれない（更新可能）', () => {
@@ -261,26 +275,74 @@ describe('generateDedupKey', () => {
   });
 });
 
+// ─── formatId ────────────────────────────────────────────────────────────────
+
+describe('formatId', () => {
+  it('"C" と 1 → "C000001"', () => {
+    expect(formatId('C', 1)).toBe('C000001');
+  });
+
+  it('"D" と 42 → "D000042"（将来の案件ID 等に使える）', () => {
+    expect(formatId('D', 42)).toBe('D000042');
+  });
+
+  it('7 桁以上は切り捨てしない', () => {
+    expect(formatId('C', 1000000)).toBe('C1000000');
+  });
+});
+
 // ─── formatCompanyId ──────────────────────────────────────────────────────────
 
 describe('formatCompanyId', () => {
-  it('1 → "000001"', () => {
-    expect(formatCompanyId(1)).toBe('000001');
+  it('1 → "C000001"', () => {
+    expect(formatCompanyId(1)).toBe('C000001');
   });
 
-  it('42 → "000042"', () => {
-    expect(formatCompanyId(42)).toBe('000042');
+  it('42 → "C000042"', () => {
+    expect(formatCompanyId(42)).toBe('C000042');
   });
 
-  it('999999 → "999999"（6 桁）', () => {
-    expect(formatCompanyId(999999)).toBe('999999');
+  it('999999 → "C999999"（6 桁）', () => {
+    expect(formatCompanyId(999999)).toBe('C999999');
   });
 
-  it('1000000 → "1000000"（7 桁以上は切り捨てしない）', () => {
-    expect(formatCompanyId(1000000)).toBe('1000000');
+  it('1000000 → "C1000000"（7 桁以上は切り捨てしない）', () => {
+    expect(formatCompanyId(1000000)).toBe('C1000000');
   });
 
   it('常に文字列を返す', () => {
     expect(typeof formatCompanyId(1)).toBe('string');
+  });
+});
+
+// ─── parseCompanyId ───────────────────────────────────────────────────────────
+
+describe('parseCompanyId', () => {
+  it('"C000001" → 1', () => {
+    expect(parseCompanyId('C000001')).toBe(1);
+  });
+
+  it('"C000042" → 42', () => {
+    expect(parseCompanyId('C000042')).toBe(42);
+  });
+
+  it('"C999999" → 999999', () => {
+    expect(parseCompanyId('C999999')).toBe(999999);
+  });
+
+  it('旧形式 "000001"（C なし）は null を返す', () => {
+    expect(parseCompanyId('000001')).toBeNull();
+  });
+
+  it('"place:ChIJxxx" は null を返す', () => {
+    expect(parseCompanyId('place:ChIJxxx')).toBeNull();
+  });
+
+  it('空文字は null を返す', () => {
+    expect(parseCompanyId('')).toBeNull();
+  });
+
+  it('数値を渡すと null を返す', () => {
+    expect(parseCompanyId(1)).toBeNull();
   });
 });
