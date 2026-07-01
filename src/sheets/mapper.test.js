@@ -3,35 +3,41 @@ import {
   HEADER_TO_FIELD,
   FIELD_TO_HEADER,
   APPROVAL_VALUE,
+  PROTECTED_FIELDS,
   colIndexToLetter,
   companyToRowByHeaders,
   rowToCompanyByHeaders,
+  generateCompanyId,
 } from './mapper.js';
 import { createCompany } from '../models/company.js';
 
-// ユーザー定義のヘッダー列（テスト全体で共通）
+// ユーザー定義のヘッダー列（テスト全体で共通: 18列）
 const HEADERS = [
-  '会社名',
-  '業種',
-  'エリア',
-  'ホームページ',
-  'メールアドレス',
-  'お問い合わせフォーム',
-  '電話番号',
-  '住所',
-  'メモ',
-  '送信日',
-  '送信可否',
-  '送信状況',
-  '担当者名',
-  '最終更新',
+  '会社名', // 0  → A
+  '業種', // 1  → B
+  'エリア', // 2  → C
+  'ホームページ', // 3  → D
+  'メールアドレス', // 4  → E
+  'お問い合わせフォーム', // 5  → F
+  '電話番号', // 6  → G
+  '住所', // 7  → H
+  'メモ', // 8  → I
+  '送信日', // 9  → J
+  '送信可否', // 10 → K
+  '送信状況', // 11 → L
+  '担当者名', // 12 → M
+  '最終更新', // 13 → N
+  '企業ID', // 14 → O
+  '返信有無', // 15 → P
+  '商談日', // 16 → Q
+  '成約', // 17 → R
 ];
 
 // ─── HEADER_TO_FIELD ──────────────────────────────────────────────────────────
 
 describe('HEADER_TO_FIELD', () => {
-  it('14 個のマッピングを持つ', () => {
-    expect(Object.keys(HEADER_TO_FIELD)).toHaveLength(14);
+  it('18 個のマッピングを持つ', () => {
+    expect(Object.keys(HEADER_TO_FIELD)).toHaveLength(18);
   });
 
   it('会社名 → companyName', () => {
@@ -171,5 +177,84 @@ describe('rowToCompanyByHeaders', () => {
     expect(restored.sendApproval).toBe(original.sendApproval);
     expect(restored.status).toBe(original.status);
     expect(restored.industry).toBe(original.industry);
+  });
+});
+
+// ─── PROTECTED_FIELDS ─────────────────────────────────────────────────────────
+
+describe('PROTECTED_FIELDS', () => {
+  it('8 個の保護フィールドを持つ', () => {
+    expect(PROTECTED_FIELDS.size).toBe(8);
+  });
+
+  it('送信可否・送信状況・送信日 が含まれる', () => {
+    expect(PROTECTED_FIELDS.has('sendApproval')).toBe(true);
+    expect(PROTECTED_FIELDS.has('status')).toBe(true);
+    expect(PROTECTED_FIELDS.has('sentDate')).toBe(true);
+  });
+
+  it('担当者名・メモ が含まれる', () => {
+    expect(PROTECTED_FIELDS.has('contactName')).toBe(true);
+    expect(PROTECTED_FIELDS.has('memo')).toBe(true);
+  });
+
+  it('返信有無・商談日・成約 が含まれる', () => {
+    expect(PROTECTED_FIELDS.has('hasReply')).toBe(true);
+    expect(PROTECTED_FIELDS.has('meetingDate')).toBe(true);
+    expect(PROTECTED_FIELDS.has('closed')).toBe(true);
+  });
+
+  it('会社名・ホームページ は含まれない（更新可能）', () => {
+    expect(PROTECTED_FIELDS.has('companyName')).toBe(false);
+    expect(PROTECTED_FIELDS.has('websiteUrl')).toBe(false);
+  });
+});
+
+// ─── generateCompanyId ────────────────────────────────────────────────────────
+
+describe('generateCompanyId', () => {
+  it('placeId があれば "place:" プレフィックスを使う', () => {
+    const company = createCompany({ placeId: 'ChIJabc123xyz' });
+    expect(generateCompanyId(company)).toBe('place:ChIJabc123xyz');
+  });
+
+  it('placeId がなく websiteUrl があれば "web:" プレフィックスを使う', () => {
+    const company = createCompany({ websiteUrl: 'https://www.example.com/path' });
+    expect(generateCompanyId(company)).toBe('web:example.com');
+  });
+
+  it('websiteUrl の www. を除去する', () => {
+    const company = createCompany({ websiteUrl: 'https://www.melt-tokyo.happytry.org/' });
+    expect(generateCompanyId(company)).toBe('web:melt-tokyo.happytry.org');
+  });
+
+  it('placeId も websiteUrl もなければ "name:" プレフィックスを使う', () => {
+    const company = createCompany({ companyName: '株式会社テスト', phone: '+81-3-1234-5678' });
+    const id = generateCompanyId(company);
+    expect(id).toMatch(/^name:/);
+    expect(id).toContain('株式会社テスト');
+  });
+
+  it('placeId が優先される（websiteUrl より）', () => {
+    const company = createCompany({
+      placeId: 'ChIJ999',
+      websiteUrl: 'https://example.com',
+    });
+    expect(generateCompanyId(company)).toBe('place:ChIJ999');
+  });
+
+  it('websiteUrl が優先される（name より）', () => {
+    const company = createCompany({
+      companyName: 'テスト',
+      phone: '0312345678',
+      websiteUrl: 'https://test.co.jp',
+    });
+    expect(generateCompanyId(company)).toBe('web:test.co.jp');
+  });
+
+  it('同じ placeId から同じ ID を生成する（冪等性）', () => {
+    const c1 = createCompany({ placeId: 'ChIJ1234' });
+    const c2 = createCompany({ placeId: 'ChIJ1234' });
+    expect(generateCompanyId(c1)).toBe(generateCompanyId(c2));
   });
 });

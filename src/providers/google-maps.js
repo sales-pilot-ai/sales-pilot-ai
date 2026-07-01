@@ -116,6 +116,7 @@ export class GoogleMapsProvider extends BaseProvider {
    */
   _toCompany(searchResult, detail, industry) {
     return createCompany({
+      placeId: detail.placeId || searchResult.placeId || '',
       companyName: detail.name || searchResult.name,
       industry,
       websiteUrl: detail.website,

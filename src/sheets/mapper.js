@@ -22,6 +22,10 @@ export const HEADER_TO_FIELD = Object.freeze({
   送信状況: 'status',
   担当者名: 'contactName',
   最終更新: 'updatedAt',
+  企業ID: 'companyId',
+  返信有無: 'hasReply',
+  商談日: 'meetingDate',
+  成約: 'closed',
 });
 
 /**
@@ -30,6 +34,45 @@ export const HEADER_TO_FIELD = Object.freeze({
 export const FIELD_TO_HEADER = Object.freeze(
   Object.fromEntries(Object.entries(HEADER_TO_FIELD).map(([h, f]) => [f, h]))
 );
+
+/**
+ * AI が自動更新できないフィールドの集合。
+ * appendCompanies のマージ処理でのみ参照される。
+ * send コマンドが updateStatus で送信状況を更新するのは許可される。
+ */
+export const PROTECTED_FIELDS = Object.freeze(
+  new Set([
+    'sendApproval', // 送信可否
+    'status', // 送信状況
+    'sentDate', // 送信日
+    'contactName', // 担当者名
+    'memo', // メモ
+    'hasReply', // 返信有無
+    'meetingDate', // 商談日
+    'closed', // 成約
+  ])
+);
+
+/**
+ * Company から企業識別子を生成する。
+ * 優先順位: Google Place ID > ホームページ URL > 企業名 + 電話番号
+ * @param {import('../models/company.js').Company} company
+ * @returns {string}
+ */
+export function generateCompanyId(company) {
+  if (company.placeId) return `place:${company.placeId}`;
+  if (company.websiteUrl) {
+    try {
+      const hostname = new URL(company.websiteUrl).hostname.replace(/^www\./, '');
+      return `web:${hostname}`;
+    } catch {
+      return `web:${company.websiteUrl}`;
+    }
+  }
+  const name = (company.companyName ?? '').trim().replace(/\s+/g, '_');
+  const phone = (company.phone ?? '').replace(/\D/g, '');
+  return `name:${name}:${phone}`;
+}
 
 /**
  * 0-based 列インデックスをアルファベット列名に変換する。

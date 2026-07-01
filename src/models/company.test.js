@@ -41,6 +41,11 @@ describe('createCompany', () => {
       'timeRexUrl',
       'sendCount',
       'googleMapsUrl',
+      'placeId',
+      'companyId',
+      'hasReply',
+      'meetingDate',
+      'closed',
       'createdAt',
       'updatedAt',
     ];

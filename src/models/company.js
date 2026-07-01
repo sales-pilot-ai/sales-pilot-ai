@@ -37,6 +37,11 @@ export const SEND_APPROVAL_VALUES = Object.freeze(['○', '×', '']);
  * @property {string}          timeRexUrl     - Meeting URL（TimeRex 等）
  * @property {number}          sendCount      - 送信済み回数（0 始まり）
  * @property {string}          googleMapsUrl  - Google Maps URL
+ * @property {string}          placeId        - Google Place ID（重複管理用）
+ * @property {string}          companyId      - 企業識別子（PlaceID / URL / 名前+電話 の優先順）
+ * @property {string}          hasReply       - 返信有無
+ * @property {string | null}   meetingDate    - 商談日（YYYY-MM-DD）
+ * @property {string}          closed         - 成約ステータス
  * @property {string}          createdAt      - 作成日時（ISO 8601）
  * @property {string}          updatedAt      - 更新日時（ISO 8601）
  */
@@ -73,6 +78,11 @@ export function createCompany(data = {}) {
     timeRexUrl: data.timeRexUrl ?? '',
     sendCount: data.sendCount ?? 0,
     googleMapsUrl: data.googleMapsUrl ?? '',
+    placeId: data.placeId ?? '',
+    companyId: data.companyId ?? '',
+    hasReply: data.hasReply ?? '',
+    meetingDate: data.meetingDate ?? null,
+    closed: data.closed ?? '',
     createdAt: data.createdAt ?? now,
     updatedAt: data.updatedAt ?? now,
   };
