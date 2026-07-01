@@ -26,6 +26,7 @@ export const HEADER_TO_FIELD = Object.freeze({
   返信有無: 'hasReply',
   商談日: 'meetingDate',
   成約: 'closed',
+  'Place ID': 'placeId',
 });
 
 /**
@@ -54,12 +55,12 @@ export const PROTECTED_FIELDS = Object.freeze(
 );
 
 /**
- * Company から企業識別子を生成する。
+ * Company から重複判定キーを生成する（dedup 専用）。
  * 優先順位: Google Place ID > ホームページ URL > 企業名 + 電話番号
  * @param {import('../models/company.js').Company} company
  * @returns {string}
  */
-export function generateCompanyId(company) {
+export function generateDedupKey(company) {
   if (company.placeId) return `place:${company.placeId}`;
   if (company.websiteUrl) {
     try {
@@ -72,6 +73,15 @@ export function generateCompanyId(company) {
   const name = (company.companyName ?? '').trim().replace(/\s+/g, '_');
   const phone = (company.phone ?? '').replace(/\D/g, '');
   return `name:${name}:${phone}`;
+}
+
+/**
+ * 連番の整数値を 000001 形式の企業ID 文字列にフォーマットする。
+ * @param {number} n  1 以上の整数
+ * @returns {string}
+ */
+export function formatCompanyId(n) {
+  return String(n).padStart(6, '0');
 }
 
 /**

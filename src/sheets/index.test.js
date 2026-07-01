@@ -9,12 +9,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createCompany } from '../models/company.js';
 import { SheetsService } from './service.js';
 
-// ─── 共通ヘッダー定義（18列）────────────────────────────────────────────────
+// ─── 共通ヘッダー定義（19列）────────────────────────────────────────────────
 
 /**
  * テスト用シートのヘッダー行。
  * 0=会社名, 4=メールアドレス, 9=送信日, 10=送信可否, 11=送信状況,
- * 12=担当者名, 13=最終更新, 14=企業ID, 15=返信有無, 16=商談日, 17=成約
+ * 12=担当者名, 13=最終更新, 14=企業ID, 15=返信有無, 16=商談日, 17=成約,
+ * 18=Place ID
  */
 const HEADERS = [
   '会社名', // 0  → A
@@ -35,6 +36,7 @@ const HEADERS = [
   '返信有無', // 15 → P
   '商談日', // 16 → Q
   '成約', // 17 → R
+  'Place ID', // 18 → S
 ];
 
 // ─── モック API ファクトリ ────────────────────────────────────────────────────
@@ -145,7 +147,7 @@ describe('appendCompanies', () => {
     expect(call.valueInputOption).toBe('RAW');
   });
 
-  it('各企業をヘッダー列数（18）と同じ要素の行として送信する', async () => {
+  it('各企業をヘッダー列数（19）と同じ要素の行として送信する', async () => {
     const company = createCompany({ companyName: 'テスト' });
     await service.appendCompanies([company]);
     const rows = api.spreadsheets.values.append.mock.calls[0][0].requestBody.values;
@@ -173,17 +175,36 @@ describe('appendCompanies', () => {
     expect(row[4]).toBe('info@test.co.jp');
   });
 
-  it('companyId が row[14]（企業ID列）に格納される', async () => {
+  it('companyId が row[14]（企業ID列）に連番で格納される', async () => {
     const company = createCompany({ companyName: 'テスト', placeId: 'ChIJtestABC' });
     await service.appendCompanies([company]);
     const row = api.spreadsheets.values.append.mock.calls[0][0].requestBody.values[0];
-    expect(row[14]).toBe('place:ChIJtestABC');
+    expect(row[14]).toBe('000001'); // シートが空なので 1 から開始
   });
 
-  it('既存企業（同じ companyId）はスキップする（dedup）', async () => {
+  it('placeId が row[18]（Place ID列）に格納される', async () => {
+    const company = createCompany({ companyName: 'テスト', placeId: 'ChIJtestABC' });
+    await service.appendCompanies([company]);
+    const row = api.spreadsheets.values.append.mock.calls[0][0].requestBody.values[0];
+    expect(row[18]).toBe('ChIJtestABC');
+  });
+
+  it('2 件目は連番が 000002 になる', async () => {
+    const companies = [
+      createCompany({ companyName: 'A', placeId: 'ChIJaaa' }),
+      createCompany({ companyName: 'B', placeId: 'ChIJbbb' }),
+    ];
+    await service.appendCompanies(companies);
+    const rows = api.spreadsheets.values.append.mock.calls[0][0].requestBody.values;
+    expect(rows[0][14]).toBe('000001');
+    expect(rows[1][14]).toBe('000002');
+  });
+
+  it('既存企業（同じ Place ID）はスキップする（dedup）', async () => {
     const existingRow = Array(HEADERS.length).fill('');
     existingRow[0] = 'melt.tokyo';
-    existingRow[14] = 'place:ChIJexisting'; // 企業ID
+    existingRow[14] = '000001'; // 企業ID（連番）
+    existingRow[18] = 'ChIJexisting'; // Place ID（dedup キー）
     api = createMockApi({
       getData: { values: [HEADERS, existingRow] },
     });
@@ -200,7 +221,8 @@ describe('appendCompanies', () => {
     const existingRow = Array(HEADERS.length).fill('');
     existingRow[0] = 'melt.tokyo';
     existingRow[4] = ''; // メールアドレスが空
-    existingRow[14] = 'place:ChIJexisting';
+    existingRow[14] = '000001'; // 企業ID（連番）
+    existingRow[18] = 'ChIJexisting'; // Place ID（dedup キー）
     api = createMockApi({
       getData: { values: [HEADERS, existingRow] },
     });
@@ -213,9 +235,11 @@ describe('appendCompanies', () => {
     });
     await service.appendCompanies([company]);
 
-    expect(api.spreadsheets.values.batchUpdate).toHaveBeenCalledOnce();
-    const data = api.spreadsheets.values.batchUpdate.mock.calls[0][0].requestBody.data;
-    const emailUpdate = data.find((d) => d.range.includes('E2'));
+    expect(api.spreadsheets.values.batchUpdate).toHaveBeenCalled();
+    const allData = api.spreadsheets.values.batchUpdate.mock.calls.flatMap(
+      (c) => c[0].requestBody.data
+    );
+    const emailUpdate = allData.find((d) => d.range.includes('E2'));
     expect(emailUpdate).toBeDefined();
     expect(emailUpdate.values).toEqual([['new@melt.tokyo']]);
   });
@@ -224,7 +248,8 @@ describe('appendCompanies', () => {
     // 全フィールドを非空で埋め、保護フィールド（送信可否）だけ空にする
     const existingRow = Array(HEADERS.length).fill('existing-value');
     existingRow[10] = ''; // 送信可否が空（保護フィールド）
-    existingRow[14] = 'place:ChIJprotected'; // 企業ID
+    existingRow[14] = '000001'; // 企業ID（連番）
+    existingRow[18] = 'ChIJprotected'; // Place ID（dedup キー）
     api = createMockApi({
       getData: { values: [HEADERS, existingRow] },
     });
@@ -245,7 +270,8 @@ describe('appendCompanies', () => {
     // 全フィールドを非空で埋め、新しいメールアドレスを送っても上書きされないことを確認
     const existingRow = Array(HEADERS.length).fill('existing-value');
     existingRow[4] = 'old@melt.tokyo'; // 既存メールアドレス
-    existingRow[14] = 'place:ChIJfilled'; // 企業ID
+    existingRow[14] = '000001'; // 企業ID（連番）
+    existingRow[18] = 'ChIJfilled'; // Place ID（dedup キー）
     api = createMockApi({
       getData: { values: [HEADERS, existingRow] },
     });
@@ -275,6 +301,65 @@ describe('appendCompanies', () => {
     expect(api.spreadsheets.values.update).toHaveBeenCalledOnce();
     const updateCall = api.spreadsheets.values.update.mock.calls[0][0];
     expect(updateCall.requestBody.values).toEqual([['企業ID']]);
+  });
+
+  it('Place ID列がシートにない場合は update で追加する', async () => {
+    const headersWithoutPlaceId = HEADERS.filter((h) => h !== 'Place ID');
+    api = createMockApi({
+      getData: { values: [headersWithoutPlaceId] },
+    });
+    service = new SheetsService({ sheetsApi: api, ...DEFAULT_OPTS });
+
+    const company = createCompany({ companyName: 'テスト' });
+    await service.appendCompanies([company]);
+
+    expect(api.spreadsheets.values.update).toHaveBeenCalledOnce();
+    const updateCall = api.spreadsheets.values.update.mock.calls[0][0];
+    expect(updateCall.requestBody.values).toEqual([['Place ID']]);
+  });
+
+  it('place:xxx 形式の企業IDを連番にマイグレーションする', async () => {
+    // 旧形式の企業ID を持つ既存行。Place ID 列は空（マイグレーションで抽出される）
+    const existingRow = Array(HEADERS.length).fill('existing-value');
+    existingRow[14] = 'place:ChIJold'; // 旧形式の企業ID
+    existingRow[18] = ''; // Place ID 列が空
+    api = createMockApi({
+      getData: { values: [HEADERS, existingRow] },
+    });
+    service = new SheetsService({ sheetsApi: api, ...DEFAULT_OPTS });
+
+    const company = createCompany({ companyName: '旧企業', placeId: 'ChIJold' });
+    const result = await service.appendCompanies([company]);
+
+    // 企業ID が '000001' に、Place ID が 'ChIJold' に更新される
+    const allData = api.spreadsheets.values.batchUpdate.mock.calls.flatMap(
+      (c) => c[0].requestBody.data
+    );
+    const idUpdate = allData.find((d) => d.range.includes('O2'));
+    expect(idUpdate?.values).toEqual([['000001']]);
+    const placeUpdate = allData.find((d) => d.range.includes('S2'));
+    expect(placeUpdate?.values).toEqual([['ChIJold']]);
+
+    // 既存企業として認識されてスキップ（append しない）
+    expect(api.spreadsheets.values.append).not.toHaveBeenCalled();
+    expect(result).toEqual({ appended: 0, merged: 1 });
+  });
+
+  it('既存行の最大 companyId + 1 から採番する', async () => {
+    // 既存行に連番 000005 の企業ID がある
+    const existingRow = Array(HEADERS.length).fill('');
+    existingRow[14] = '000005';
+    existingRow[18] = 'ChIJexisting';
+    api = createMockApi({
+      getData: { values: [HEADERS, existingRow] },
+    });
+    service = new SheetsService({ sheetsApi: api, ...DEFAULT_OPTS });
+
+    const company = createCompany({ companyName: '新企業', placeId: 'ChIJnew' });
+    await service.appendCompanies([company]);
+
+    const row = api.spreadsheets.values.append.mock.calls[0][0].requestBody.values[0];
+    expect(row[14]).toBe('000006'); // 既存最大 + 1
   });
 });
 

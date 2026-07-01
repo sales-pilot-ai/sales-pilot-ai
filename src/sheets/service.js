@@ -7,7 +7,8 @@ import {
   colIndexToLetter,
   companyToRowByHeaders,
   rowToCompanyByHeaders,
-  generateCompanyId,
+  generateDedupKey,
+  formatCompanyId,
 } from './mapper.js';
 
 export class SheetsService {
@@ -70,9 +71,11 @@ export class SheetsService {
   /**
    * 企業リストをスプレッドシートへ追記する。
    *
-   * - companyId（企業ID）で既存行を検索し、重複はスキップ
+   * - 企業ID は連番（000001 形式）で採番し、一度付与したら変更しない
+   * - Place ID / websiteUrl / 企業名+電話で重複判定し、既存企業はスキップ
    * - 既存行には空欄のみ補完（PROTECTED_FIELDS は除外）
    * - 新規行は一括 append
+   * - 旧形式（place:xxx）の企業ID を持つ行は自動マイグレーション
    * - 電話番号等の「+」始まりが #ERROR! にならないよう valueInputOption:'RAW' を使用
    *
    * @param {import('../models/company.js').Company[]} companies
@@ -86,7 +89,7 @@ export class SheetsService {
       return null;
     }
 
-    // シート全データを取得（dedup / merge のため常に新鮮なデータ）
+    // シート全データを取得（dedup / merge / migration のため常に新鮮なデータ）
     const res = await this._api.spreadsheets.values.get({
       spreadsheetId,
       range: this._sheetName,
@@ -97,8 +100,7 @@ export class SheetsService {
     // 企業ID列がなければヘッダー行に追加する
     const companyIdHeader = FIELD_TO_HEADER['companyId']; // '企業ID'
     if (!headers.includes(companyIdHeader)) {
-      const newColIndex = headers.length;
-      const newColLetter = colIndexToLetter(newColIndex);
+      const newColLetter = colIndexToLetter(headers.length);
       await this._api.spreadsheets.values.update({
         spreadsheetId,
         range: `${this._sheetName}!${newColLetter}1`,
@@ -109,31 +111,86 @@ export class SheetsService {
       logger.info(`[Sheets] 「企業ID」列を追加しました（${newColLetter}列）`);
     }
 
+    // Place ID 列がなければヘッダー行に追加する
+    const placeIdHeader = FIELD_TO_HEADER['placeId']; // 'Place ID'
+    if (!headers.includes(placeIdHeader)) {
+      const newColLetter = colIndexToLetter(headers.length);
+      await this._api.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${this._sheetName}!${newColLetter}1`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[placeIdHeader]] },
+      });
+      headers.push(placeIdHeader);
+      logger.info(`[Sheets] 「Place ID」列を追加しました（${newColLetter}列）`);
+    }
+
     // ヘッダーキャッシュを更新（常に最新状態で上書き）
     this._headerCache = this._buildHeaderCache(headers);
     const { fieldToColIndex } = this._headerCache;
 
-    // 既存企業ID → { rowIndex, row } マップを構築
     const companyIdColIndex = fieldToColIndex.get('companyId') ?? -1;
-    const existingMap = new Map();
+    const placeIdColIndex = fieldToColIndex.get('placeId') ?? -1;
+
+    // 既存行を走査: 連番でない企業IDを持つ行はマイグレーション対象
+    let maxNum = 0;
+    const rowsNeedingMigration = [];
     for (let i = 1; i < allRows.length; i++) {
       const row = allRows[i];
       const id = companyIdColIndex >= 0 ? (row[companyIdColIndex] ?? '') : '';
-      if (id) existingMap.set(id, { rowIndex: i + 1, row });
+      if (id !== '' && /^\d+$/.test(id)) {
+        maxNum = Math.max(maxNum, parseInt(id, 10));
+      } else {
+        rowsNeedingMigration.push({ rowIndex: i + 1, row, oldId: id });
+      }
+    }
+
+    // マイグレーション: 旧形式の企業IDを連番に変換し、place:xxx から Place ID を抽出する
+    // row は allRows[i] への参照なので in-memory 更新すれば dedup でも反映される
+    for (const { rowIndex, row, oldId } of rowsNeedingMigration) {
+      maxNum++;
+      const newId = formatCompanyId(maxNum);
+      const updates = { companyId: newId };
+      if (companyIdColIndex >= 0) row[companyIdColIndex] = newId;
+
+      if (
+        placeIdColIndex >= 0 &&
+        (row[placeIdColIndex] ?? '') === '' &&
+        oldId.startsWith('place:')
+      ) {
+        const extractedPlaceId = oldId.slice('place:'.length);
+        updates.placeId = extractedPlaceId;
+        row[placeIdColIndex] = extractedPlaceId;
+      }
+
+      await this.updateStatus(rowIndex, updates);
+      logger.info(
+        `[Sheets] 行 ${rowIndex}: 企業ID を ${newId} に設定（旧ID: ${oldId || '未設定'}）`
+      );
+    }
+
+    // dedup マップ: generateDedupKey → { rowIndex, row }
+    // Place ID > websiteUrl > 企業名+電話 の優先順位で重複判定
+    const dedupMap = new Map();
+    for (let i = 1; i < allRows.length; i++) {
+      const row = allRows[i];
+      const rowCompany = rowToCompanyByHeaders(row, headers);
+      const key = generateDedupKey(rowCompany);
+      if (key) dedupMap.set(key, { rowIndex: i + 1, row });
     }
 
     // 各企業を新規 or 既存（重複）に分類
     const toAppend = [];
     const toMerge = [];
     for (const company of companies) {
-      const id = generateCompanyId(company);
-      const enriched = { ...company, companyId: id };
-      const existing = existingMap.get(id);
+      const key = generateDedupKey(company);
+      const existing = dedupMap.get(key);
       if (!existing) {
-        toAppend.push(enriched);
+        maxNum++;
+        toAppend.push({ ...company, companyId: formatCompanyId(maxNum) });
       } else {
         toMerge.push({
-          company: enriched,
+          company,
           rowIndex: existing.rowIndex,
           existingRow: existing.row,
         });

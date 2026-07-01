@@ -7,11 +7,12 @@ import {
   colIndexToLetter,
   companyToRowByHeaders,
   rowToCompanyByHeaders,
-  generateCompanyId,
+  generateDedupKey,
+  formatCompanyId,
 } from './mapper.js';
 import { createCompany } from '../models/company.js';
 
-// ユーザー定義のヘッダー列（テスト全体で共通: 18列）
+// ユーザー定義のヘッダー列（テスト全体で共通: 19列）
 const HEADERS = [
   '会社名', // 0  → A
   '業種', // 1  → B
@@ -31,13 +32,14 @@ const HEADERS = [
   '返信有無', // 15 → P
   '商談日', // 16 → Q
   '成約', // 17 → R
+  'Place ID', // 18 → S
 ];
 
 // ─── HEADER_TO_FIELD ──────────────────────────────────────────────────────────
 
 describe('HEADER_TO_FIELD', () => {
-  it('18 個のマッピングを持つ', () => {
-    expect(Object.keys(HEADER_TO_FIELD)).toHaveLength(18);
+  it('19 個のマッピングを持つ', () => {
+    expect(Object.keys(HEADER_TO_FIELD)).toHaveLength(19);
   });
 
   it('会社名 → companyName', () => {
@@ -210,29 +212,29 @@ describe('PROTECTED_FIELDS', () => {
   });
 });
 
-// ─── generateCompanyId ────────────────────────────────────────────────────────
+// ─── generateDedupKey ────────────────────────────────────────────────────────
 
-describe('generateCompanyId', () => {
+describe('generateDedupKey', () => {
   it('placeId があれば "place:" プレフィックスを使う', () => {
     const company = createCompany({ placeId: 'ChIJabc123xyz' });
-    expect(generateCompanyId(company)).toBe('place:ChIJabc123xyz');
+    expect(generateDedupKey(company)).toBe('place:ChIJabc123xyz');
   });
 
   it('placeId がなく websiteUrl があれば "web:" プレフィックスを使う', () => {
     const company = createCompany({ websiteUrl: 'https://www.example.com/path' });
-    expect(generateCompanyId(company)).toBe('web:example.com');
+    expect(generateDedupKey(company)).toBe('web:example.com');
   });
 
   it('websiteUrl の www. を除去する', () => {
     const company = createCompany({ websiteUrl: 'https://www.melt-tokyo.happytry.org/' });
-    expect(generateCompanyId(company)).toBe('web:melt-tokyo.happytry.org');
+    expect(generateDedupKey(company)).toBe('web:melt-tokyo.happytry.org');
   });
 
   it('placeId も websiteUrl もなければ "name:" プレフィックスを使う', () => {
     const company = createCompany({ companyName: '株式会社テスト', phone: '+81-3-1234-5678' });
-    const id = generateCompanyId(company);
-    expect(id).toMatch(/^name:/);
-    expect(id).toContain('株式会社テスト');
+    const key = generateDedupKey(company);
+    expect(key).toMatch(/^name:/);
+    expect(key).toContain('株式会社テスト');
   });
 
   it('placeId が優先される（websiteUrl より）', () => {
@@ -240,7 +242,7 @@ describe('generateCompanyId', () => {
       placeId: 'ChIJ999',
       websiteUrl: 'https://example.com',
     });
-    expect(generateCompanyId(company)).toBe('place:ChIJ999');
+    expect(generateDedupKey(company)).toBe('place:ChIJ999');
   });
 
   it('websiteUrl が優先される（name より）', () => {
@@ -249,12 +251,36 @@ describe('generateCompanyId', () => {
       phone: '0312345678',
       websiteUrl: 'https://test.co.jp',
     });
-    expect(generateCompanyId(company)).toBe('web:test.co.jp');
+    expect(generateDedupKey(company)).toBe('web:test.co.jp');
   });
 
-  it('同じ placeId から同じ ID を生成する（冪等性）', () => {
+  it('同じ placeId から同じキーを生成する（冪等性）', () => {
     const c1 = createCompany({ placeId: 'ChIJ1234' });
     const c2 = createCompany({ placeId: 'ChIJ1234' });
-    expect(generateCompanyId(c1)).toBe(generateCompanyId(c2));
+    expect(generateDedupKey(c1)).toBe(generateDedupKey(c2));
+  });
+});
+
+// ─── formatCompanyId ──────────────────────────────────────────────────────────
+
+describe('formatCompanyId', () => {
+  it('1 → "000001"', () => {
+    expect(formatCompanyId(1)).toBe('000001');
+  });
+
+  it('42 → "000042"', () => {
+    expect(formatCompanyId(42)).toBe('000042');
+  });
+
+  it('999999 → "999999"（6 桁）', () => {
+    expect(formatCompanyId(999999)).toBe('999999');
+  });
+
+  it('1000000 → "1000000"（7 桁以上は切り捨てしない）', () => {
+    expect(formatCompanyId(1000000)).toBe('1000000');
+  });
+
+  it('常に文字列を返す', () => {
+    expect(typeof formatCompanyId(1)).toBe('string');
   });
 });
