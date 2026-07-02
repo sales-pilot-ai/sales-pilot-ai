@@ -8,6 +8,7 @@ import { statusCommand } from './commands/status.js';
 import { setupCommand } from './commands/setup.js';
 import { doctorCommand } from './commands/doctor.js';
 import { checkRepliesCommand } from './commands/check-replies.js';
+import { reportCommand } from './commands/report.js';
 
 program
   .name('sales-pilot')
@@ -63,5 +64,10 @@ program
   .description('Gmail スレッドを確認して返信を検知し、営業リストと返信履歴を更新する')
   .option('--dry-run', '実際には更新せず確認対象を表示するのみ')
   .action(checkRepliesCommand);
+
+program
+  .command('report')
+  .description('営業活動の集計レポート（総合・返信・営業）を CLI へ表示する')
+  .action(reportCommand);
 
 program.parse();

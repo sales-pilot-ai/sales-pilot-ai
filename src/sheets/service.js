@@ -1,4 +1,5 @@
 import { logger } from '../utils/logger.js';
+import { SEND_STATUS } from '../constants/index.js';
 import {
   APPROVAL_VALUE,
   PROTECTED_FIELDS,
@@ -382,6 +383,54 @@ export class SheetsService {
         _rowIndex: i + 2,
       }))
       .filter((c) => companyIdColIndex < 0 || (c.companyId ?? '') !== '');
+  }
+
+  /**
+   * 営業リストの集計統計を返す。
+   * getAllCompanies() の結果のみから算出し、追加の API 呼び出しは行わない。
+   * 失注（lostCount）は将来ステータス追加予定のため現時点では常に 0。
+   * @returns {Promise<{
+   *   totalCompanies: number,
+   *   sentCount: number,
+   *   sendRate: number,
+   *   waitingCount: number,
+   *   repliedCount: number,
+   *   replyRate: number,
+   *   meetingCount: number,
+   *   closedCount: number,
+   *   lostCount: number,
+   *   unsubscribedCount: number,
+   * }>}
+   */
+  async getStats() {
+    const companies = await this.getAllCompanies();
+
+    const totalCompanies = companies.length;
+    const sentCount = companies.filter((c) => (c.sentDate ?? '') !== '').length;
+    const waitingCount = companies.filter(
+      (c) =>
+        (c.sendApproval ?? '') === APPROVAL_VALUE &&
+        [SEND_STATUS.NOT_SENT, SEND_STATUS.FAILED, ''].includes(c.status ?? '')
+    ).length;
+    const repliedCount = companies.filter((c) => c.status === SEND_STATUS.REPLIED).length;
+    const meetingCount = companies.filter((c) => (c.meetingDate ?? '') !== '').length;
+    const closedCount = companies.filter((c) => (c.closed ?? '') !== '').length;
+    const unsubscribedCount = companies.filter(
+      (c) => c.status === SEND_STATUS.UNSUBSCRIBED
+    ).length;
+
+    return {
+      totalCompanies,
+      sentCount,
+      sendRate: totalCompanies ? (sentCount / totalCompanies) * 100 : 0,
+      waitingCount,
+      repliedCount,
+      replyRate: sentCount ? (repliedCount / sentCount) * 100 : 0,
+      meetingCount,
+      closedCount,
+      lostCount: 0,
+      unsubscribedCount,
+    };
   }
 
   /**
