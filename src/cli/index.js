@@ -36,6 +36,7 @@ program
   .option('--skip-analyzer', 'WebsiteAnalyzer をスキップする', false)
   .option('--dry-run', 'スプレッドシートへの保存をスキップする', false)
   .option('-y, --yes', '確認プロンプトをスキップして即実行する', false)
+  .option('-r, --review', '候補を1社ずつ確認してから保存する対話モード', false)
   .action(findCommand);
 
 program

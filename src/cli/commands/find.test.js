@@ -2,14 +2,36 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── モック ───────────────────────────────────────────────────────────────────
 
-const { mockFindCompanies, mockPromptFindOptions, mockConfirmFindExecution } = vi.hoisted(() => ({
+const {
+  mockFindCompanies,
+  mockPromptFindOptions,
+  mockConfirmFindExecution,
+  mockAppendCompanies,
+  mockReviewCompanies,
+  mockPromptReviewDecision,
+  mockPrintReviewSummary,
+} = vi.hoisted(() => ({
   mockFindCompanies: vi.fn(),
   mockPromptFindOptions: vi.fn(),
   mockConfirmFindExecution: vi.fn(),
+  mockAppendCompanies: vi.fn(),
+  mockReviewCompanies: vi.fn(),
+  mockPromptReviewDecision: vi.fn(),
+  mockPrintReviewSummary: vi.fn(),
 }));
 
 vi.mock('../../crawler/find.js', () => ({
   findCompanies: mockFindCompanies,
+}));
+
+vi.mock('../../sheets/index.js', () => ({
+  appendCompanies: mockAppendCompanies,
+}));
+
+vi.mock('./find-review.js', () => ({
+  reviewCompanies: mockReviewCompanies,
+  promptReviewDecision: mockPromptReviewDecision,
+  printReviewSummary: mockPrintReviewSummary,
 }));
 
 vi.mock('../prompts.js', () => ({
@@ -38,6 +60,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockFindCompanies.mockResolvedValue([]);
   mockConfirmFindExecution.mockResolvedValue(true);
+  mockReviewCompanies.mockResolvedValue({ approved: [], skippedCount: 0, remainingCount: 0 });
+  mockAppendCompanies.mockResolvedValue({ appended: 0, merged: 0 });
   vi.spyOn(process, 'exit').mockImplementation(() => {
     throw new Error('process.exit');
   });
@@ -298,6 +322,141 @@ describe('findCommand', () => {
         dryRun: false,
       });
       expect(logger.info).toHaveBeenCalledWith('キャンセルしました');
+    });
+  });
+
+  describe('--review モード', () => {
+    it('review 指定時は skipSheets を true にして findCompanies を呼ぶ（自動保存を止める）', async () => {
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+      expect(mockFindCompanies).toHaveBeenCalledWith(
+        '飲食店',
+        '東京',
+        expect.objectContaining({ skipSheets: true })
+      );
+    });
+
+    it('reviewCompanies に findCompanies の結果と promptReviewDecision を渡す', async () => {
+      const companies = [{ companyId: 'C1' }, { companyId: 'C2' }];
+      mockFindCompanies.mockResolvedValue(companies);
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+
+      expect(mockReviewCompanies).toHaveBeenCalledWith(companies, mockPromptReviewDecision);
+    });
+
+    it('承認された企業のみ appendCompanies に渡す', async () => {
+      const approved = [{ companyId: 'C1' }];
+      mockReviewCompanies.mockResolvedValue({ approved, skippedCount: 1, remainingCount: 0 });
+      mockAppendCompanies.mockResolvedValue({ appended: 1, merged: 0 });
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+
+      expect(mockAppendCompanies).toHaveBeenCalledWith(approved);
+    });
+
+    it('承認が0件のときは appendCompanies を呼ばない', async () => {
+      mockReviewCompanies.mockResolvedValue({ approved: [], skippedCount: 3, remainingCount: 0 });
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+
+      expect(mockAppendCompanies).not.toHaveBeenCalled();
+    });
+
+    it('--dry-run 併用時は承認企業があっても appendCompanies を呼ばない', async () => {
+      const approved = [{ companyId: 'C1' }];
+      mockReviewCompanies.mockResolvedValue({ approved, skippedCount: 0, remainingCount: 0 });
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: true,
+        review: true,
+      });
+
+      expect(mockAppendCompanies).not.toHaveBeenCalled();
+    });
+
+    it('appendCompanies の appended/merged を printReviewSummary に渡す', async () => {
+      const approved = [{ companyId: 'C1' }, { companyId: 'C2' }];
+      mockReviewCompanies.mockResolvedValue({ approved, skippedCount: 8, remainingCount: 35 });
+      mockAppendCompanies.mockResolvedValue({ appended: 15, merged: 2 });
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+
+      expect(mockPrintReviewSummary).toHaveBeenCalledWith({
+        addedCount: 15,
+        mergedCount: 2,
+        skippedCount: 8,
+        remainingCount: 35,
+      });
+    });
+
+    it('承認0件のとき printReviewSummary に addedCount 0 / mergedCount 0 を渡す', async () => {
+      mockReviewCompanies.mockResolvedValue({ approved: [], skippedCount: 5, remainingCount: 0 });
+
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+        review: true,
+      });
+
+      expect(mockPrintReviewSummary).toHaveBeenCalledWith({
+        addedCount: 0,
+        mergedCount: 0,
+        skippedCount: 5,
+        remainingCount: 0,
+      });
+    });
+
+    it('review 未指定時は reviewCompanies を呼ばない', async () => {
+      await findCommand({
+        industry: '飲食店',
+        area: '東京',
+        limit: '20',
+        skipAnalyzer: false,
+        dryRun: false,
+      });
+      expect(mockReviewCompanies).not.toHaveBeenCalled();
     });
   });
 

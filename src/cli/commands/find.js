@@ -1,5 +1,7 @@
 import { findCompanies } from '../../crawler/find.js';
+import { appendCompanies } from '../../sheets/index.js';
 import { promptFindOptions, confirmFindExecution } from '../prompts.js';
+import { reviewCompanies, promptReviewDecision, printReviewSummary } from './find-review.js';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -10,10 +12,11 @@ import { logger } from '../../utils/logger.js';
  *   skipAnalyzer: boolean,
  *   dryRun: boolean,
  *   yes: boolean,
+ *   review?: boolean,
  * }} options
  */
 export async function findCommand(options) {
-  let { industry, area, limit: limitStr, skipAnalyzer, dryRun, yes } = options;
+  let { industry, area, limit: limitStr, skipAnalyzer, dryRun, yes, review = false } = options;
 
   // --industry / --area が未指定のときは対話形式で補完する
   if (!industry || !area) {
@@ -44,11 +47,31 @@ export async function findCommand(options) {
   }
 
   try {
+    // --review 時は findCompanies() 内での自動保存を止め、レビュー後に承認分だけ保存する
     const companies = await findCompanies(industry, area, {
       limit,
       skipAnalyzer,
-      skipSheets: dryRun,
+      skipSheets: dryRun || review,
     });
+
+    if (review) {
+      const { approved, skippedCount, remainingCount } = await reviewCompanies(
+        companies,
+        promptReviewDecision
+      );
+
+      let addedCount = 0;
+      let mergedCount = 0;
+      if (approved.length > 0 && !dryRun) {
+        const result = await appendCompanies(approved);
+        addedCount = result?.appended ?? 0;
+        mergedCount = result?.merged ?? 0;
+      }
+
+      printReviewSummary({ addedCount, mergedCount, skippedCount, remainingCount });
+      return;
+    }
+
     logger.success(`${companies.length} 件の企業情報を取得しました`);
   } catch (err) {
     logger.error(`エラーが発生しました: ${err.message}`);
