@@ -290,12 +290,18 @@ sales-pilot send --dry-run
 
 # 送信済み企業にも強制送信（再送）
 sales-pilot send --force
+
+# 使用するテンプレートを指定
+sales-pilot send --template second_follow_up
 ```
 
-| オプション  | 説明                                         |
-| ----------- | -------------------------------------------- |
-| `--dry-run` | 実際には送信せず、送信内容をターミナルに表示 |
-| `--force`   | ステータスが「送信済」の企業にも送信         |
+| オプション         | 説明                                                   |
+| ------------------ | ------------------------------------------------------ |
+| `--dry-run`        | 実際には送信せず、送信内容をターミナルに表示            |
+| `--force`          | ステータスが「送信済」の企業にも送信                    |
+| `--template <name>` | 使用するテンプレート名（省略時はデフォルトテンプレート）|
+
+存在しないテンプレート名を指定するとエラー終了します（`sales-pilot template list` で確認できます）。
 
 **送信ステータスの扱い**
 
@@ -447,6 +453,50 @@ Sales Pilot AI — 今日のアクションリスト
 
 ---
 
+### `sales-pilot template` — メールテンプレートを管理
+
+「初回営業」だけでなく、「2回目フォロー」「商談後お礼」「再アプローチ」など複数のメールテンプレートを管理できます。本体は `templates/emails/` 配下のファイル（`.txt`/`.html`/`.subject.txt`）、メタデータ（表示名・説明）は `templates/emails/templates.json` に保存されます。
+
+```bash
+# テンプレート一覧（★/(default) が現在のデフォルト）
+sales-pilot template list
+
+# 内容を表示
+sales-pilot template show initial_contact
+
+# 新規作成（対話形式。本文はエディタ（$EDITOR）で入力）
+sales-pilot template create
+
+# 既存テンプレートを編集
+sales-pilot template edit second_follow_up
+
+# 既存テンプレートを複製して新しいテンプレートを作る
+sales-pilot template duplicate initial_contact second_follow_up
+
+# テンプレートを削除
+sales-pilot template delete second_follow_up
+```
+
+```
+★ initial_contact (default)
+    表示名  : 初回営業
+    説明    : 新規開拓の初回コンタクトメール
+    HTML    : あり
+    最終更新: 2026-07-02T09:30:25.728Z
+
+  second_follow_up
+    表示名  : 2回目フォロー
+    説明    : 初回送信から反応がない企業へのフォロー
+    HTML    : なし
+    最終更新: 2026-07-02T10:00:00.000Z
+```
+
+- 現在の**デフォルトテンプレート**（`sales-pilot config` の `DEFAULT_TEMPLATE`）には `★`と`(default)`が付きます
+- デフォルトテンプレートは `template delete` で削除できません（先に `sales-pilot config` でデフォルトを変更してください）
+- `sales-pilot send --template <name>` で送信時に使用するテンプレートを切り替えられます（省略時はデフォルトテンプレート）
+
+---
+
 ### `sales-pilot doctor` — 環境診断
 
 設定と接続状態を素早く確認します。
@@ -479,7 +529,7 @@ sales-pilot setup
 
 ### `sales-pilot config` — 設定を変更
 
-`.env` の設定値を対話形式で変更します。
+`.env`/`config/settings.json` の設定値を対話形式で変更します。デフォルトテンプレート（`DEFAULT_TEMPLATE`）もここで変更できます。
 
 ```bash
 sales-pilot config
@@ -489,13 +539,14 @@ sales-pilot config
 
 ## メールテンプレートのカスタマイズ
 
-`templates/emails/` 以下のファイルを編集してテンプレートを変更できます。
+複数テンプレートの作成・編集・削除は `sales-pilot template` コマンド（[上記参照](#sales-pilot-template--メールテンプレートを管理)）から行うのが基本です。`templates/emails/` 以下のファイルを直接編集することもできます。
 
 | ファイル                      | 用途         |
 | ----------------------------- | ------------ |
 | `initial_contact.subject.txt` | メール件名   |
 | `initial_contact.txt`         | テキスト本文 |
 | `initial_contact.html`        | HTML 本文    |
+| `templates.json`              | 表示名・説明などのメタデータ（`template` コマンドが自動管理） |
 
 使用できるテンプレート変数：
 

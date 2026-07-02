@@ -99,6 +99,7 @@ P000001 = 担当者ID（Person）— 将来予定
 | `send`                               | 送信可否○の企業に一括メール送信  | ✅ 動作 |
 | `send --dry-run`                     | 送信内容を確認のみ（実送信なし） | ✅ 動作 |
 | `send --force`                       | 送信済企業にも強制送信           | ✅ 動作 |
+| `send --template <name>`             | 使用するテンプレートを指定して送信 | ✅ 動作 |
 | `auth`                               | Gmail OAuth 認証を実行           | ✅ 動作 |
 | `config`                             | `.env` の設定を対話的に変更      | ✅ 動作 |
 | `setup`                              | 初期セットアップガイド           | ✅ 動作 |
@@ -108,6 +109,7 @@ P000001 = 担当者ID（Person）— 将来予定
 | `report`                             | 営業活動の集計レポートを表示     | ✅ 動作 |
 | `update <companyId>`                 | 商談日・成約・失注・メモを更新   | ✅ 動作 |
 | `follow-up`                          | 今日のアクションリストを表示     | ✅ 動作 |
+| `template list/show/create/edit/duplicate/delete` | メールテンプレートの複数管理 | ✅ 動作 |
 
 ### Google Sheets 管理
 

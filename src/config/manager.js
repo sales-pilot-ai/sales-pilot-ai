@@ -17,6 +17,7 @@ export const CONFIG_KEYS = Object.freeze([
   'MEETING_URL',
   'DEFAULT_LIMIT',
   'REQUEST_DELAY_MS',
+  'DEFAULT_TEMPLATE',
 ]);
 
 /** 各キーの日本語ラベル */
@@ -27,6 +28,7 @@ export const CONFIG_LABELS = Object.freeze({
   MEETING_URL: 'Meeting URL',
   DEFAULT_LIMIT: 'デフォルト取得件数',
   REQUEST_DELAY_MS: 'WebsiteAnalyzer待機時間(ms)',
+  DEFAULT_TEMPLATE: 'デフォルトメールテンプレート',
 });
 
 /**
@@ -53,6 +55,7 @@ function getSettingsValue(key) {
   const json = readSettingsFile();
   if (key === 'DEFAULT_LIMIT') return String(json.crawler.defaultLimit);
   if (key === 'REQUEST_DELAY_MS') return String(json.crawler.requestDelayMs);
+  if (key === 'DEFAULT_TEMPLATE') return String(json.mailer.defaultTemplate ?? '');
   return '';
 }
 
@@ -74,9 +77,9 @@ function writeEnvValue(key, value) {
 
 function writeSettingsValue(key, rawValue) {
   const json = readSettingsFile();
-  const num = Number(rawValue);
-  if (key === 'DEFAULT_LIMIT') json.crawler.defaultLimit = num;
-  if (key === 'REQUEST_DELAY_MS') json.crawler.requestDelayMs = num;
+  if (key === 'DEFAULT_LIMIT') json.crawler.defaultLimit = Number(rawValue);
+  if (key === 'REQUEST_DELAY_MS') json.crawler.requestDelayMs = Number(rawValue);
+  if (key === 'DEFAULT_TEMPLATE') json.mailer.defaultTemplate = rawValue;
   writeFileSync(SETTINGS_PATH, JSON.stringify(json, null, 2) + '\n', 'utf-8');
 }
 

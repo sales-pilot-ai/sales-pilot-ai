@@ -26,7 +26,7 @@ const MOCK_SETTINGS = {
     approvalValue: '○',
   },
   crawler: { defaultLimit: 20, requestDelayMs: 1500 },
-  mailer: { sendIntervalMs: 3000 },
+  mailer: { sendIntervalMs: 3000, defaultTemplate: 'initial_contact' },
 };
 
 beforeEach(() => {
@@ -40,10 +40,11 @@ beforeEach(() => {
 // ─── テスト ───────────────────────────────────────────────────────────────────
 
 describe('CONFIG_KEYS', () => {
-  it('6 つのキーを含む', () => {
-    expect(CONFIG_KEYS).toHaveLength(6);
+  it('7 つのキーを含む', () => {
+    expect(CONFIG_KEYS).toHaveLength(7);
     expect(CONFIG_KEYS).toContain('SPREADSHEET_ID');
     expect(CONFIG_KEYS).toContain('DEFAULT_LIMIT');
+    expect(CONFIG_KEYS).toContain('DEFAULT_TEMPLATE');
   });
 });
 
@@ -73,6 +74,11 @@ describe('getCurrentValue', () => {
   it('settings.json キー: REQUEST_DELAY_MS をファイルから読む', () => {
     mockReadFileSync.mockReturnValue(JSON.stringify(MOCK_SETTINGS));
     expect(getCurrentValue('REQUEST_DELAY_MS')).toBe('1500');
+  });
+
+  it('settings.json キー: DEFAULT_TEMPLATE をファイルから読む', () => {
+    mockReadFileSync.mockReturnValue(JSON.stringify(MOCK_SETTINGS));
+    expect(getCurrentValue('DEFAULT_TEMPLATE')).toBe('initial_contact');
   });
 });
 
@@ -129,6 +135,13 @@ describe('updateSetting', () => {
       updateSetting('REQUEST_DELAY_MS', '2000');
       const [, content] = mockWriteFileSync.mock.calls[0];
       expect(JSON.parse(content).crawler.requestDelayMs).toBe(2000);
+    });
+
+    it('DEFAULT_TEMPLATE を文字列のまま書き込む', () => {
+      mockReadFileSync.mockReturnValue(JSON.stringify(MOCK_SETTINGS));
+      updateSetting('DEFAULT_TEMPLATE', 'second_follow_up');
+      const [, content] = mockWriteFileSync.mock.calls[0];
+      expect(JSON.parse(content).mailer.defaultTemplate).toBe('second_follow_up');
     });
   });
 

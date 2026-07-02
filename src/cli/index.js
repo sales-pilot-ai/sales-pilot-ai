@@ -11,6 +11,14 @@ import { checkRepliesCommand } from './commands/check-replies.js';
 import { reportCommand } from './commands/report.js';
 import { updateCommand } from './commands/update.js';
 import { followUpCommand } from './commands/follow-up.js';
+import {
+  templateListCommand,
+  templateShowCommand,
+  templateCreateCommand,
+  templateEditCommand,
+  templateDuplicateCommand,
+  templateDeleteCommand,
+} from './commands/template.js';
 
 program
   .name('sales-pilot')
@@ -45,6 +53,7 @@ program
   .option('-p, --preview', '送信前に内容を確認する画面を表示する')
   .option('--dry-run', '実際には送信せず内容を確認のみ')
   .option('--force', '送信済企業にも強制送信する')
+  .option('--template <name>', '使用するテンプレート名（省略時はデフォルトテンプレート）')
   .action(sendCommand);
 
 program
@@ -86,5 +95,37 @@ program
   .command('follow-up')
   .description('今日やるべきフォローアップ（商談予定・返信待ち）を優先順位順に表示する')
   .action(followUpCommand);
+
+const templateCmd = program.command('template').description('メールテンプレートを管理する');
+
+templateCmd
+  .command('list')
+  .description('テンプレート一覧を表示する（デフォルトには★が付く）')
+  .action(templateListCommand);
+
+templateCmd
+  .command('show <name>')
+  .description('テンプレートの件名・本文を表示する')
+  .action(templateShowCommand);
+
+templateCmd
+  .command('create')
+  .description('新しいテンプレートを対話形式で作成する')
+  .action(templateCreateCommand);
+
+templateCmd
+  .command('edit <name>')
+  .description('既存テンプレートを対話形式で編集する')
+  .action(templateEditCommand);
+
+templateCmd
+  .command('duplicate <source> <newName>')
+  .description('既存テンプレートを複製して新しいテンプレートを作成する')
+  .action(templateDuplicateCommand);
+
+templateCmd
+  .command('delete <name>')
+  .description('テンプレートを削除する（現在のデフォルトテンプレートは削除不可）')
+  .action(templateDeleteCommand);
 
 program.parse();

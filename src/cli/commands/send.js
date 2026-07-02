@@ -10,22 +10,30 @@ import { loadEmailTemplates, buildEmailContent } from './email-builder.js';
 import { shouldSkip } from './send-filter.js';
 import { runPreview } from './send-preview.js';
 import { SEND_STATUS } from '../../constants/index.js';
-import { env } from '../../config/index.js';
+import { env, settings } from '../../config/index.js';
+import { listTemplates, templateExists } from '../../templates/manager.js';
 import { logger } from '../../utils/logger.js';
 
-const TEMPLATE_NAME = 'initial_contact';
-const SCENARIO_NAME = '初回営業';
-
 /**
- * @param {{ dryRun?: boolean, force?: boolean, preview?: boolean }} options
+ * @param {{ dryRun?: boolean, force?: boolean, preview?: boolean, template?: string }} options
  */
 export async function sendCommand(options) {
   const dryRun = options.dryRun ?? env.isDryRun;
   const force = options.force ?? false;
   const preview = options.preview ?? false;
+  const templateName = options.template || settings.mailer.defaultTemplate;
 
   if (dryRun) logger.warn('DRY RUNモード: メールは実際には送信されません');
   if (force) logger.warn('--force モード: 送信済企業にも送信します');
+
+  if (!templateExists(templateName)) {
+    logger.error(
+      `テンプレート「${templateName}」が見つかりません。'sales-pilot template list' で確認してください`
+    );
+    process.exit(1);
+    return;
+  }
+  const scenarioName = listTemplates().find((t) => t.name === templateName)?.displayName ?? templateName;
 
   const counts = { sent: 0, skipped: 0, failed: 0 };
 
@@ -38,7 +46,7 @@ export async function sendCommand(options) {
       return;
     }
 
-    const templates = loadEmailTemplates(TEMPLATE_NAME);
+    const templates = loadEmailTemplates(templateName);
 
     if (preview) {
       const confirmed = await runPreview(companies, templates, { force });
@@ -71,8 +79,8 @@ export async function sendCommand(options) {
               result: SEND_RESULT.SKIPPED,
               error: reason,
               sender: env.gmailFrom,
-              templateName: TEMPLATE_NAME,
-              scenarioName: SCENARIO_NAME,
+              templateName,
+              scenarioName,
             })
             .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
         }
@@ -119,8 +127,8 @@ export async function sendCommand(options) {
             result: SEND_RESULT.SUCCESS,
             error: '',
             sender: env.gmailFrom,
-            templateName: TEMPLATE_NAME,
-            scenarioName: SCENARIO_NAME,
+            templateName,
+            scenarioName,
           })
           .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
 
@@ -145,8 +153,8 @@ export async function sendCommand(options) {
             result: SEND_RESULT.FAILED,
             error: err.message,
             sender: env.gmailFrom,
-            templateName: TEMPLATE_NAME,
-            scenarioName: SCENARIO_NAME,
+            templateName,
+            scenarioName,
           })
           .catch((e) => logger.warn(`[History] 履歴書込失敗: ${e.message}`));
 
