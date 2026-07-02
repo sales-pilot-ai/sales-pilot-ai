@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import { SEND_STATUS } from '../constants/index.js';
+import { SEND_STATUS, DEAL_RESULT } from '../constants/index.js';
 import {
   APPROVAL_VALUE,
   PROTECTED_FIELDS,
@@ -388,7 +388,6 @@ export class SheetsService {
   /**
    * 営業リストの集計統計を返す。
    * getAllCompanies() の結果のみから算出し、追加の API 呼び出しは行わない。
-   * 失注（lostCount）は将来ステータス追加予定のため現時点では常に 0。
    * @returns {Promise<{
    *   totalCompanies: number,
    *   sentCount: number,
@@ -414,10 +413,13 @@ export class SheetsService {
     ).length;
     const repliedCount = companies.filter((c) => c.status === SEND_STATUS.REPLIED).length;
     const meetingCount = companies.filter((c) => (c.meetingDate ?? '') !== '').length;
-    const closedCount = companies.filter((c) => (c.closed ?? '') !== '').length;
-    const unsubscribedCount = companies.filter(
-      (c) => c.status === SEND_STATUS.UNSUBSCRIBED
+    // 失注（DEAL_RESULT.LOST）を優先判定し、それ以外の非空値は後方互換として成約扱いにする
+    // （'closed' 列は update コマンド導入前は自由記述だったため）
+    const lostCount = companies.filter((c) => c.closed === DEAL_RESULT.LOST).length;
+    const closedCount = companies.filter(
+      (c) => (c.closed ?? '') !== '' && c.closed !== DEAL_RESULT.LOST
     ).length;
+    const unsubscribedCount = companies.filter((c) => c.status === SEND_STATUS.UNSUBSCRIBED).length;
 
     return {
       totalCompanies,
@@ -428,20 +430,51 @@ export class SheetsService {
       replyRate: sentCount ? (repliedCount / sentCount) * 100 : 0,
       meetingCount,
       closedCount,
-      lostCount: 0,
+      lostCount,
       unsubscribedCount,
     };
   }
 
   /**
+   * 指定フィールドに対応する列がなければヘッダー行の末尾に追加する。
+   * appendCompanies() が 企業ID / Place ID 列を自動追加するのと同じパターンを
+   * 汎用化したもの（#028: 商談日・成約 列が未作成のシートでも update コマンドが使えるように）。
+   * @param {string[]} fields  Company フィールド名の配列
+   */
+  async _ensureColumnsExist(fields) {
+    const spreadsheetId = this._requireSpreadsheetId();
+    const { headers } = await this._loadHeaders();
+    let currentHeaders = headers;
+
+    for (const field of fields) {
+      const headerName = FIELD_TO_HEADER[field];
+      if (!headerName || currentHeaders.includes(headerName)) continue;
+
+      const newColLetter = colIndexToLetter(currentHeaders.length);
+      await this._api.spreadsheets.values.update({
+        spreadsheetId,
+        range: `${this._sheetName}!${newColLetter}1`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[headerName]] },
+      });
+      currentHeaders = [...currentHeaders, headerName];
+      logger.info(`[Sheets] 「${headerName}」列がなかったため ${newColLetter} 列に追加しました`);
+    }
+
+    this._headerCache = this._buildHeaderCache(currentHeaders);
+  }
+
+  /**
    * companyId を指定して営業リストの行を更新する。
    * 行番号を知らなくても companyId だけで更新できる公開メソッド。
+   * 更新対象フィールドの列がシートに存在しない場合は自動的に追加する。
    * @param {string} companyId  例: 'C000001'
    * @param {Record<string, string | number | null>} values
    * @returns {Promise<object | null>}
    */
   async updateCompanyByCompanyId(companyId, values) {
     const spreadsheetId = this._requireSpreadsheetId();
+    await this._ensureColumnsExist(Object.keys(values));
     const rowIndex = await this._findRowByCompanyId(spreadsheetId, companyId);
     if (rowIndex === null) {
       logger.warn(`[Sheets] companyId ${companyId} が見つかりません`);

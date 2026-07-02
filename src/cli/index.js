@@ -9,6 +9,7 @@ import { setupCommand } from './commands/setup.js';
 import { doctorCommand } from './commands/doctor.js';
 import { checkRepliesCommand } from './commands/check-replies.js';
 import { reportCommand } from './commands/report.js';
+import { updateCommand } from './commands/update.js';
 
 program
   .name('sales-pilot')
@@ -69,5 +70,14 @@ program
   .command('report')
   .description('営業活動の集計レポート（総合・返信・営業）を CLI へ表示する')
   .action(reportCommand);
+
+program
+  .command('update <companyId>')
+  .description('企業のステータス（商談日・成約・失注・メモ）をシートを開かずに更新する')
+  .option('--meeting <date>', '商談日を設定する（YYYY-MM-DD）')
+  .option('--won', '成約として記録する')
+  .option('--lost [reason]', '失注として記録する（理由を指定可）')
+  .option('--memo <text>', 'メモを追記する')
+  .action(updateCommand);
 
 program.parse();

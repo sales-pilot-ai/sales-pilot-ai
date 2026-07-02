@@ -115,14 +115,26 @@ describe('SheetsService.getStats', () => {
   });
 
   it('成約が設定されている企業を成約件数として数える', async () => {
-    const service = makeService([makeCompany({ closed: '○' }), makeCompany({ closed: '' })]);
+    const service = makeService([makeCompany({ closed: '成約' }), makeCompany({ closed: '' })]);
     const stats = await service.getStats();
     expect(stats.closedCount).toBe(1);
   });
 
-  it('失注件数は常に 0 を返す（将来ステータス追加予定）', async () => {
-    const service = makeService([makeCompany(), makeCompany()]);
+  it('失注が設定されている企業を失注件数として数える', async () => {
+    const service = makeService([
+      makeCompany({ closed: '失注' }),
+      makeCompany({ closed: '成約' }),
+      makeCompany({ closed: '' }),
+    ]);
     const stats = await service.getStats();
+    expect(stats.lostCount).toBe(1);
+    expect(stats.closedCount).toBe(1);
+  });
+
+  it('update コマンド導入前の自由記述の成約マークも成約件数として数える（後方互換）', async () => {
+    const service = makeService([makeCompany({ closed: '○' })]);
+    const stats = await service.getStats();
+    expect(stats.closedCount).toBe(1);
     expect(stats.lostCount).toBe(0);
   });
 
@@ -134,5 +146,116 @@ describe('SheetsService.getStats', () => {
     const stats = await service.getStats();
     expect(stats.unsubscribedCount).toBe(1);
     expect(stats.lostCount).toBe(0);
+  });
+});
+
+// ─── updateCompanyByCompanyId: 列の自動追加 ───────────────────────────────────
+
+/** 「商談日」「成約」列を含まない標準的な営業リストのヘッダー */
+const HEADERS_WITHOUT_DEAL_COLUMNS = [
+  '企業ID',
+  '会社名',
+  '業種',
+  'エリア',
+  'ホームページ',
+  'メールアドレス',
+  'お問い合わせフォーム',
+  '電話番号',
+  '住所',
+  'メモ',
+  '送信日',
+  '送信可否',
+  '送信状況',
+  '担当者名',
+  '最終更新',
+  'Place ID',
+];
+
+/** ヘッダー行の取得・単一セル更新・行データ取得・batchUpdate をモックした sheetsApi を返す */
+function makeSheetsApiForUpdate({ headers, row }) {
+  const state = { headers: [...headers] };
+
+  return {
+    _state: state,
+    spreadsheets: {
+      values: {
+        get: vi.fn((params) => {
+          if (params.range.endsWith('!1:1')) {
+            return Promise.resolve({ data: { values: [state.headers] } });
+          }
+          return Promise.resolve({ data: { values: [state.headers, row] } });
+        }),
+        update: vi.fn((params) => {
+          state.headers.push(params.requestBody.values[0][0]);
+          return Promise.resolve({});
+        }),
+        batchUpdate: vi.fn().mockResolvedValue({ data: {} }),
+      },
+    },
+  };
+}
+
+describe('SheetsService.updateCompanyByCompanyId — 列の自動追加', () => {
+  it('更新対象フィールドの列が既に存在する場合は列を追加しない', async () => {
+    const sheetsApi = makeSheetsApiForUpdate({
+      headers: HEADERS_WITHOUT_DEAL_COLUMNS,
+      row: ['C000001', 'テスト株式会社'],
+    });
+    const service = new SheetsService({ sheetsApi, spreadsheetId: 'sheet-id' });
+
+    await service.updateCompanyByCompanyId('C000001', { status: '送信済' });
+
+    expect(sheetsApi.spreadsheets.values.update).not.toHaveBeenCalled();
+  });
+
+  it('「商談日」列が存在しない場合はヘッダー行の末尾に自動追加してから書き込む', async () => {
+    const sheetsApi = makeSheetsApiForUpdate({
+      headers: HEADERS_WITHOUT_DEAL_COLUMNS,
+      row: ['C000001', 'テスト株式会社'],
+    });
+    const service = new SheetsService({ sheetsApi, spreadsheetId: 'sheet-id' });
+
+    await service.updateCompanyByCompanyId('C000001', { meetingDate: '2026-07-10' });
+
+    expect(sheetsApi.spreadsheets.values.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        range: expect.stringContaining('!Q1'),
+        requestBody: { values: [['商談日']] },
+      })
+    );
+    expect(sheetsApi._state.headers).toContain('商談日');
+  });
+
+  it('「成約」列が存在しない場合もヘッダー行の末尾に自動追加する', async () => {
+    const sheetsApi = makeSheetsApiForUpdate({
+      headers: HEADERS_WITHOUT_DEAL_COLUMNS,
+      row: ['C000001', 'テスト株式会社'],
+    });
+    const service = new SheetsService({ sheetsApi, spreadsheetId: 'sheet-id' });
+
+    await service.updateCompanyByCompanyId('C000001', { closed: '成約' });
+
+    expect(sheetsApi.spreadsheets.values.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        range: expect.stringContaining('!Q1'),
+        requestBody: { values: [['成約']] },
+      })
+    );
+  });
+
+  it('複数フィールドが同時に不足している場合は両方の列を追加する', async () => {
+    const sheetsApi = makeSheetsApiForUpdate({
+      headers: HEADERS_WITHOUT_DEAL_COLUMNS,
+      row: ['C000001', 'テスト株式会社'],
+    });
+    const service = new SheetsService({ sheetsApi, spreadsheetId: 'sheet-id' });
+
+    await service.updateCompanyByCompanyId('C000001', {
+      meetingDate: '2026-07-10',
+      closed: '失注',
+    });
+
+    expect(sheetsApi.spreadsheets.values.update).toHaveBeenCalledTimes(2);
+    expect(sheetsApi._state.headers).toEqual(expect.arrayContaining(['商談日', '成約']));
   });
 });

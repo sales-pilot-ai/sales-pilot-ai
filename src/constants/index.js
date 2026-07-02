@@ -34,3 +34,15 @@ export const SEND_STATUS = Object.freeze({
 
 /** @type {readonly string[]} */
 export const SEND_STATUS_VALUES = Object.freeze(Object.values(SEND_STATUS));
+
+// ─── 商談結果 ─────────────────────────────────────────────────────────────────
+
+/**
+ * 商談結果。スプレッドシートの 成約（closed）列に書き込む日本語値。
+ * @readonly
+ * @enum {string}
+ */
+export const DEAL_RESULT = Object.freeze({
+  WON: '成約',
+  LOST: '失注',
+});
