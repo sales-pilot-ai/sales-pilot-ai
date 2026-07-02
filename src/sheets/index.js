@@ -22,6 +22,7 @@ export {
   DASHBOARD_SHEET,
   DASHBOARD_COLUMNS,
 } from './dashboard.js';
+export { buildFollowUpList, flattenFollowUpList, FOLLOW_UP_CATEGORIES } from './follow-up.js';
 
 /**
  * 認証済みの SheetsService インスタンスを生成する。

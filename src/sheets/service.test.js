@@ -149,6 +149,26 @@ describe('SheetsService.getStats', () => {
   });
 });
 
+// ─── getFollowUpList ──────────────────────────────────────────────────────────
+
+describe('SheetsService.getFollowUpList', () => {
+  it('新しい API コールを追加せず getAllCompanies のみを呼ぶ', async () => {
+    const service = makeService([]);
+    await service.getFollowUpList(new Date('2026-07-02T03:00:00Z'));
+    expect(service.getAllCompanies).toHaveBeenCalledTimes(1);
+  });
+
+  it('getAllCompanies の結果を follow-up の分類ロジックへ委譲する', async () => {
+    const service = makeService([
+      makeCompany({ companyId: 'C000002', meetingDate: '2026-07-02' }),
+    ]);
+    const result = await service.getFollowUpList(new Date('2026-07-02T03:00:00Z'));
+    expect(result.referenceDate).toBe('2026-07-02');
+    expect(result.meetingToday).toHaveLength(1);
+    expect(result.meetingToday[0]).toMatchObject({ companyId: 'C000002', actionType: 'MEETING' });
+  });
+});
+
 // ─── updateCompanyByCompanyId: 列の自動追加 ───────────────────────────────────
 
 /** 「商談日」「成約」列を含まない標準的な営業リストのヘッダー */

@@ -46,3 +46,26 @@ export const DEAL_RESULT = Object.freeze({
   WON: '成約',
   LOST: '失注',
 });
+
+// ─── フォローアップ（follow-up コマンド）────────────────────────────────────────
+
+/**
+ * 返信待ち企業を「要フォロー」「経過観察」に分類する経過日数の閾値。
+ * @readonly
+ */
+export const FOLLOW_UP_THRESHOLD_DAYS = Object.freeze({
+  WARNING: 3,
+  URGENT: 7,
+});
+
+/**
+ * フォローアップ項目の行動種別。Web管理画面でのアイコン・色分けや、
+ * 将来の通知機能（Slack/LINE）でのメッセージ分岐に共通利用する。
+ * @readonly
+ * @enum {string}
+ */
+export const ACTION_TYPE = Object.freeze({
+  MEETING: 'MEETING',
+  FOLLOW_UP: 'FOLLOW_UP',
+  WAIT_REPLY: 'WAIT_REPLY',
+});

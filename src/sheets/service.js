@@ -12,6 +12,7 @@ import {
   formatCompanyId,
   parseCompanyId,
 } from './mapper.js';
+import { buildFollowUpList } from './follow-up.js';
 
 export class SheetsService {
   /**
@@ -433,6 +434,19 @@ export class SheetsService {
       lostCount,
       unsubscribedCount,
     };
+  }
+
+  /**
+   * 今日やるべきフォローアップ（商談予定・返信待ち）をカテゴリ別に返す。
+   * getAllCompanies() の結果のみから算出し、追加の API 呼び出しは行わない。
+   * CLI（`follow-up` コマンド）と将来の Web管理画面・通知機能（Slack/LINE）から
+   * 共通で利用できるよう、分類ロジックは follow-up.js の純粋関数に委譲する。
+   * @param {Date} [referenceDate]  基準日時（テスト用に注入可能。省略時は現在時刻）
+   * @returns {Promise<ReturnType<typeof buildFollowUpList>>}
+   */
+  async getFollowUpList(referenceDate = new Date()) {
+    const companies = await this.getAllCompanies();
+    return buildFollowUpList(companies, referenceDate);
   }
 
   /**

@@ -10,6 +10,7 @@ import { doctorCommand } from './commands/doctor.js';
 import { checkRepliesCommand } from './commands/check-replies.js';
 import { reportCommand } from './commands/report.js';
 import { updateCommand } from './commands/update.js';
+import { followUpCommand } from './commands/follow-up.js';
 
 program
   .name('sales-pilot')
@@ -79,5 +80,10 @@ program
   .option('--lost [reason]', '失注として記録する（理由を指定可）')
   .option('--memo <text>', 'メモを追記する')
   .action(updateCommand);
+
+program
+  .command('follow-up')
+  .description('今日やるべきフォローアップ（商談予定・返信待ち）を優先順位順に表示する')
+  .action(followUpCommand);
 
 program.parse();

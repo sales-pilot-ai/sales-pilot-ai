@@ -106,6 +106,7 @@ P000001 = 担当者ID（Person）— 将来予定
 | `check-replies`                      | 返信を検知して状態を更新         | ✅ 動作 |
 | `report`                             | 営業活動の集計レポートを表示     | ✅ 動作 |
 | `update <companyId>`                 | 商談日・成約・失注・メモを更新   | ✅ 動作 |
+| `follow-up`                          | 今日のアクションリストを表示     | ✅ 動作 |
 
 ### Google Sheets 管理
 
