@@ -48,11 +48,22 @@ export async function sendCommand(options) {
 
     const templates = loadEmailTemplates(templateName);
 
+    let sendTargets = companies;
     if (preview) {
-      const confirmed = await runPreview(companies, templates, { force });
+      const { confirmed, excludedCompanyIds } = await runPreview(companies, templates, {
+        force,
+        templateName,
+        templateDisplayName: scenarioName,
+      });
       if (!confirmed) {
         logger.info('送信をキャンセルしました');
         return;
+      }
+      if (excludedCompanyIds.length > 0) {
+        sendTargets = companies.filter((c) => !excludedCompanyIds.includes(c.companyId));
+        logger.info(
+          `${excludedCompanyIds.length}件を今回の送信対象から除外しました（営業リストは変更していません）`
+        );
       }
       console.log('');
     }
@@ -62,7 +73,7 @@ export async function sendCommand(options) {
     const sendHistory = dryRun ? null : await createSendHistoryService();
     if (sendHistory) await sendHistory.ensureSheet();
 
-    for (const company of companies) {
+    for (const company of sendTargets) {
       const { skip, reason } = shouldSkip(company, { force });
 
       if (skip) {

@@ -3,8 +3,8 @@ import inquirer from 'inquirer';
 import { buildEmailContent } from './email-builder.js';
 import { shouldSkip } from './send-filter.js';
 
-const BODY_PREVIEW_LINES = 5;
 const COL_WIDTH = 56;
+const SUBJECT_PREVIEW_LENGTH = 40;
 
 /**
  * 送信対象と送信対象外に分類し、対象企業のメール内容を構築する。
@@ -13,7 +13,7 @@ const COL_WIDTH = 56;
  * @param {{ textTemplate: string, htmlTemplate: string|null, subjectTemplate: string|null }} templates
  * @param {{ force?: boolean }} [options]
  * @returns {Promise<{
- *   targets: Array<{ company: object, subject: string, textBody: string }>,
+ *   targets: Array<{ company: object, subject: string, textBody: string, htmlBody?: string }>,
  *   skips:   Array<{ company: object, reason: string }>,
  * }>}
  */
@@ -34,19 +34,45 @@ export async function buildPreviewItems(companies, templates, { force = false } 
   return { targets, skips };
 }
 
+// ─── 表示 ──────────────────────────────────────────────────────────────────────
+
 /**
- * @param {Array<{ company: object, subject: string, textBody: string }>} targets
- * @param {Array<{ company: object, reason: string }>} skips
+ * @param {string} text
+ * @param {number} length
  */
-export function renderPreview(targets, skips) {
+function truncate(text, length) {
+  if (text.length <= length) return text;
+  return text.slice(0, length - 1) + '…';
+}
+
+/**
+ * @param {{ templateName: string, templateDisplayName: string, targetCount: number, skipCount: number, excludedCount?: number }} info
+ */
+export function renderPreviewHeader({
+  templateName,
+  templateDisplayName,
+  targetCount,
+  skipCount,
+  excludedCount = 0,
+}) {
   const SEP = chalk.dim('═'.repeat(COL_WIDTH));
-  const LINE = chalk.dim('─'.repeat(COL_WIDTH));
 
   console.log('\n' + SEP);
   console.log(chalk.bold(' 送信プレビュー'));
-  console.log(SEP);
+  console.log(` テンプレート: ${chalk.cyan(templateDisplayName)} (${templateName})`);
 
-  // ── 送信対象 ──────────────────────────────────────────
+  const excludedNote = excludedCount > 0 ? `  今回除外: ${chalk.yellow(excludedCount)}件` : '';
+  console.log(` 送信対象: ${chalk.green.bold(targetCount)}件  対象外: ${skipCount}件${excludedNote}`);
+  console.log(SEP);
+}
+
+/**
+ * 送信対象・対象外・今回のみ除外した企業を一覧表示する（コンパクト表）。
+ * @param {Array<{ company: object, subject: string }>} targets
+ * @param {Array<{ company: object, reason: string }>} skips
+ * @param {Array<{ company: object, subject: string }>} [excluded]
+ */
+export function renderPreviewTable(targets, skips, excluded = []) {
   console.log(
     '\n' + chalk.green(`──── 送信対象 ${targets.length}件`) + chalk.dim(' ' + '─'.repeat(38))
   );
@@ -54,30 +80,16 @@ export function renderPreview(targets, skips) {
   if (targets.length === 0) {
     console.log(chalk.dim('  （送信対象なし）'));
   } else {
-    for (let i = 0; i < targets.length; i++) {
-      const { company, subject, textBody } = targets[i];
-      const id = chalk.dim(company.companyId || '(ID なし)');
-      const name = chalk.bold(company.companyName || '(会社名なし)');
-      const email = chalk.cyan(company.email);
-
-      console.log(`\n[${i + 1}] ${id}  ${name}`);
-      console.log(`    ${email}`);
-      console.log(`    件名: ${subject}`);
-      console.log(chalk.dim('    ┌─────────────────────────────────────────'));
-
-      const lines = textBody.split('\n');
-      const previewLines = lines.slice(0, BODY_PREVIEW_LINES);
-      for (const line of previewLines) {
-        console.log(chalk.dim('    │ ') + line);
-      }
-      if (lines.length > BODY_PREVIEW_LINES) {
-        console.log(chalk.dim(`    │ …（全${lines.length}行）`));
-      }
-      console.log(chalk.dim('    └─────────────────────────────────────────'));
-    }
+    targets.forEach((target, i) => {
+      const { company, subject } = target;
+      const no = chalk.dim(`[${i + 1}]`);
+      const id = chalk.dim(String(company.companyId || '').padEnd(8));
+      const name = String(company.companyName || '(会社名なし)').padEnd(20);
+      const email = chalk.cyan(String(company.email || '').padEnd(24));
+      console.log(`${no} ${id} ${name} ${email} ${truncate(subject, SUBJECT_PREVIEW_LENGTH)}`);
+    });
   }
 
-  // ── 送信対象外 ────────────────────────────────────────
   if (skips.length > 0) {
     console.log(
       '\n' + chalk.yellow(`──── 送信対象外 ${skips.length}件`) + chalk.dim(' ' + '─'.repeat(36))
@@ -89,44 +101,159 @@ export function renderPreview(targets, skips) {
     }
   }
 
-  // ── フッター ──────────────────────────────────────────
-  const skipNote = skips.length > 0 ? `  送信対象外: ${chalk.yellow(String(skips.length))}件` : '';
-  console.log('\n' + LINE);
-  console.log(`  送信対象: ${chalk.green.bold(String(targets.length))}件${skipNote}`);
-  console.log(LINE + '\n');
+  if (excluded.length > 0) {
+    console.log(
+      '\n' + chalk.yellow(`──── 今回のみ除外 ${excluded.length}件`) + chalk.dim(' ' + '─'.repeat(30))
+    );
+    for (const { company } of excluded) {
+      const id = chalk.dim(String(company.companyId || '').padEnd(8));
+      const name = String(company.companyName || '(会社名なし)').padEnd(24);
+      console.log(`  ${id}  ${name}  → ${chalk.yellow('手動で除外（営業リストは変更されません）')}`);
+    }
+  }
+
+  console.log('');
 }
 
 /**
- * @returns {Promise<boolean>}
+ * 1社分の件名・本文全文を表示する（省略なし）。
+ * @param {{ company: object, subject: string, textBody: string, htmlBody?: string }} target
+ * @param {number} index  0-based
+ * @param {number} total
  */
-export async function confirmSend() {
-  const { confirmed } = await inquirer.prompt([
+export function renderTargetDetail(target, index, total) {
+  const { company, subject, textBody, htmlBody } = target;
+  const LINE = chalk.dim('─'.repeat(COL_WIDTH));
+
+  console.log('\n' + LINE);
+  console.log(`[${index + 1}/${total}] ${chalk.dim(company.companyId)}  ${chalk.bold(company.companyName)}`);
+  console.log(`      ${chalk.cyan(company.email)}`);
+  console.log(`      件名: ${subject}`);
+  console.log(`      HTML版: ${htmlBody ? 'あり' : 'なし'}`);
+  console.log(LINE);
+  console.log(textBody);
+  console.log(LINE + '\n');
+}
+
+// ─── 対話プロンプト ─────────────────────────────────────────────────────────────
+
+/**
+ * 一覧画面での操作を選択させる。
+ * @returns {Promise<'send' | 'inspect' | 'cancel'>}
+ */
+export async function promptPreviewAction() {
+  const { action } = await inquirer.prompt([
     {
-      type: 'confirm',
-      name: 'confirmed',
-      message: '送信を実行しますか？',
-      default: true,
+      type: 'list',
+      name: 'action',
+      message: 'どうしますか？',
+      choices: [
+        { name: 'このまま送信する', value: 'send' },
+        { name: '番号を指定して本文を確認する', value: 'inspect' },
+        { name: 'キャンセル', value: 'cancel' },
+      ],
     },
   ]);
-  return confirmed;
+  return action;
 }
+
+/**
+ * 確認する企業の番号（1-based表示 → 0-basedで返す）を尋ねる。
+ * @param {number} total
+ * @returns {Promise<number>}
+ */
+export async function promptPreviewNumber(total) {
+  const { number } = await inquirer.prompt([
+    {
+      type: 'number',
+      name: 'number',
+      message: `確認する番号を入力してください (1-${total}):`,
+      validate: (v) => (Number.isInteger(v) && v >= 1 && v <= total) || `1〜${total}の番号を入力してください`,
+    },
+  ]);
+  return number - 1;
+}
+
+/**
+ * 本文確認画面での操作を選択させる。
+ * @returns {Promise<'back' | 'exclude'>}
+ */
+export async function promptDetailAction() {
+  const { action } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'action',
+      message: 'どうしますか？',
+      choices: [
+        { name: '一覧に戻る', value: 'back' },
+        { name: 'この企業を今回の送信対象から外す', value: 'exclude' },
+      ],
+    },
+  ]);
+  return action;
+}
+
+// ─── オーケストレーション ────────────────────────────────────────────────────────
 
 /**
  * プレビュー画面を表示して最終確認を取る。
  * 送信対象が 0 件の場合は確認なしで false を返す。
+ * 本文確認画面から「今回だけ送信対象から外す」を選べる。除外は今回の送信にのみ影響し、
+ * 営業リスト（送信可否等）は一切変更しない。
  *
  * @param {import('../../models/company.js').Company[]} companies
  * @param {{ textTemplate: string, htmlTemplate: string|null, subjectTemplate: string|null }} templates
- * @param {{ force?: boolean }} [options]
- * @returns {Promise<boolean>} 送信を続行する場合 true
+ * @param {{ force?: boolean, templateName?: string, templateDisplayName?: string }} [options]
+ * @returns {Promise<{ confirmed: boolean, excludedCompanyIds: string[] }>}
  */
-export async function runPreview(companies, templates, { force = false } = {}) {
-  const { targets, skips } = await buildPreviewItems(companies, templates, { force });
-  renderPreview(targets, skips);
+export async function runPreview(
+  companies,
+  templates,
+  { force = false, templateName = '', templateDisplayName = '' } = {}
+) {
+  const { targets: initialTargets, skips } = await buildPreviewItems(companies, templates, { force });
 
-  if (targets.length === 0) {
-    return false;
+  if (initialTargets.length === 0) {
+    renderPreviewHeader({ templateName, templateDisplayName, targetCount: 0, skipCount: skips.length });
+    renderPreviewTable([], skips);
+    return { confirmed: false, excludedCompanyIds: [] };
   }
 
-  return confirmSend();
+  let targets = initialTargets;
+  const excluded = [];
+
+  while (true) {
+    renderPreviewHeader({
+      templateName,
+      templateDisplayName,
+      targetCount: targets.length,
+      skipCount: skips.length,
+      excludedCount: excluded.length,
+    });
+    renderPreviewTable(targets, skips, excluded);
+
+    if (targets.length === 0) {
+      return { confirmed: false, excludedCompanyIds: excluded.map((t) => t.company.companyId) };
+    }
+
+    const action = await promptPreviewAction();
+
+    if (action === 'send') {
+      return { confirmed: true, excludedCompanyIds: excluded.map((t) => t.company.companyId) };
+    }
+    if (action === 'cancel') {
+      return { confirmed: false, excludedCompanyIds: excluded.map((t) => t.company.companyId) };
+    }
+
+    // action === 'inspect'
+    const index = await promptPreviewNumber(targets.length);
+    const target = targets[index];
+    renderTargetDetail(target, index, targets.length);
+
+    const detailAction = await promptDetailAction();
+    if (detailAction === 'exclude') {
+      targets = targets.filter((_, i) => i !== index);
+      excluded.push(target);
+    }
+  }
 }

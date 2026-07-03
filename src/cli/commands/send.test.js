@@ -124,3 +124,46 @@ describe('sendCommand — テンプレート解決', () => {
     expect(mockTemplateExists).toHaveBeenCalledWith('second_follow_up');
   });
 });
+
+describe('sendCommand — --preview', () => {
+  const companies = [
+    { companyId: 'C1', companyName: 'A' },
+    { companyId: 'C2', companyName: 'B' },
+  ];
+
+  beforeEach(() => {
+    mockGetApprovedRows.mockResolvedValue(companies);
+    mockShouldSkip.mockReturnValue({ skip: true, reason: '送信可否×' });
+  });
+
+  it('runPreview にテンプレート名・表示名を渡す', async () => {
+    mockRunPreview.mockResolvedValue({ confirmed: true, excludedCompanyIds: [] });
+    await sendCommand({ preview: true });
+    expect(mockRunPreview).toHaveBeenCalledWith(
+      companies,
+      expect.any(Object),
+      expect.objectContaining({ templateName: 'initial_contact', templateDisplayName: '初回営業' })
+    );
+  });
+
+  it('confirmed:false のとき送信ループを実行しない', async () => {
+    mockRunPreview.mockResolvedValue({ confirmed: false, excludedCompanyIds: [] });
+    await sendCommand({ preview: true });
+    expect(mockShouldSkip).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith('送信をキャンセルしました');
+  });
+
+  it('excludedCompanyIds で指定した企業は送信ループの対象から外れる', async () => {
+    mockRunPreview.mockResolvedValue({ confirmed: true, excludedCompanyIds: ['C1'] });
+    await sendCommand({ preview: true });
+    const processedIds = mockShouldSkip.mock.calls.map(([company]) => company.companyId);
+    expect(processedIds).toEqual(['C2']);
+  });
+
+  it('除外が無い場合は全社が送信ループの対象になる', async () => {
+    mockRunPreview.mockResolvedValue({ confirmed: true, excludedCompanyIds: [] });
+    await sendCommand({ preview: true });
+    const processedIds = mockShouldSkip.mock.calls.map(([company]) => company.companyId);
+    expect(processedIds).toEqual(['C1', 'C2']);
+  });
+});

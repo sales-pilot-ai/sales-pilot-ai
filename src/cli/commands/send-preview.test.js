@@ -27,7 +27,16 @@ vi.mock('./email-builder.js', () => ({
 // ─── テスト対象 ───────────────────────────────────────────────────────────────
 
 import { buildEmailContent } from './email-builder.js';
-import { buildPreviewItems, renderPreview, confirmSend, runPreview } from './send-preview.js';
+import {
+  buildPreviewItems,
+  renderPreviewHeader,
+  renderPreviewTable,
+  renderTargetDetail,
+  promptPreviewAction,
+  promptPreviewNumber,
+  promptDetailAction,
+  runPreview,
+} from './send-preview.js';
 import { SEND_STATUS } from '../../constants/index.js';
 
 // ─── セットアップ ─────────────────────────────────────────────────────────────
@@ -60,7 +69,11 @@ const TEMPLATES = {
   subjectTemplate: null,
 };
 
-// ─── buildPreviewItems ────────────────────────────────────────────────────────
+function loggedText() {
+  return console.log.mock.calls.map((args) => args.join(' ')).join('\n');
+}
+
+// ─── buildPreviewItems（無改造・既存テストを維持） ─────────────────────────────
 
 describe('buildPreviewItems', () => {
   describe('送信対象の分類', () => {
@@ -155,9 +168,52 @@ describe('buildPreviewItems', () => {
   });
 });
 
-// ─── renderPreview ────────────────────────────────────────────────────────────
+// ─── renderPreviewHeader ──────────────────────────────────────────────────────
 
-describe('renderPreview', () => {
+describe('renderPreviewHeader', () => {
+  it('テンプレートの表示名・内部名を表示する', () => {
+    renderPreviewHeader({
+      templateName: 'initial_contact',
+      templateDisplayName: '初回営業',
+      targetCount: 3,
+      skipCount: 1,
+    });
+    const text = loggedText();
+    expect(text).toContain('初回営業');
+    expect(text).toContain('initial_contact');
+  });
+
+  it('送信対象件数・対象外件数を表示する', () => {
+    renderPreviewHeader({
+      templateName: 'x',
+      templateDisplayName: 'X',
+      targetCount: 3,
+      skipCount: 1,
+    });
+    const text = loggedText();
+    expect(text).toContain('3');
+    expect(text).toContain('1');
+  });
+
+  it('excludedCount が0より大きいときのみ今回除外件数を表示する', () => {
+    renderPreviewHeader({
+      templateName: 'x',
+      templateDisplayName: 'X',
+      targetCount: 2,
+      skipCount: 0,
+      excludedCount: 1,
+    });
+    expect(loggedText()).toContain('今回除外');
+
+    console.log.mockClear();
+    renderPreviewHeader({ templateName: 'x', templateDisplayName: 'X', targetCount: 2, skipCount: 0 });
+    expect(loggedText()).not.toContain('今回除外');
+  });
+});
+
+// ─── renderPreviewTable ───────────────────────────────────────────────────────
+
+describe('renderPreviewTable', () => {
   const targets = [
     {
       company: makeCompany({ companyId: 'C000001', companyName: '株式会社ターゲット' }),
@@ -172,105 +228,189 @@ describe('renderPreview', () => {
     },
   ];
 
-  it('console.log を呼ぶ', () => {
-    renderPreview(targets, skips);
-    expect(console.log).toHaveBeenCalled();
+  it('送信対象の会社名・メール・件名を表示する', () => {
+    renderPreviewTable(targets, []);
+    const text = loggedText();
+    expect(text).toContain('株式会社ターゲット');
+    expect(text).toContain('test@example.co.jp');
+    expect(text).toContain('テスト件名');
   });
 
-  it('送信対象企業名が出力に含まれる', () => {
-    renderPreview(targets, skips);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('株式会社ターゲット');
+  it('送信対象外の会社名・理由を表示する', () => {
+    renderPreviewTable(targets, skips);
+    const text = loggedText();
+    expect(text).toContain('株式会社スキップ');
+    expect(text).toContain('メールなし');
   });
 
-  it('件名が出力に含まれる', () => {
-    renderPreview(targets, skips);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('テスト件名');
+  it('送信対象 0件のとき「送信対象なし」を表示する', () => {
+    renderPreviewTable([], []);
+    expect(loggedText()).toContain('送信対象なし');
   });
 
-  it('メールアドレスが出力に含まれる', () => {
-    renderPreview(targets, skips);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('test@example.co.jp');
+  it('skips が空のとき「送信対象外」セクションを出力しない', () => {
+    renderPreviewTable(targets, []);
+    expect(loggedText()).not.toContain('送信対象外');
   });
 
-  it('送信対象外企業名が出力に含まれる', () => {
-    renderPreview(targets, skips);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('株式会社スキップ');
+  it('excluded を渡すと「今回のみ除外」セクションを表示する', () => {
+    const excluded = [{ company: makeCompany({ companyId: 'C000003', companyName: '株式会社除外' }) }];
+    renderPreviewTable(targets, [], excluded);
+    const text = loggedText();
+    expect(text).toContain('今回のみ除外');
+    expect(text).toContain('株式会社除外');
+    expect(text).toContain('営業リストは変更されません');
   });
 
-  it('スキップ理由が出力に含まれる', () => {
-    renderPreview(targets, skips);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('メールなし');
+  it('excluded を渡さない場合は「今回のみ除外」セクションを出力しない', () => {
+    renderPreviewTable(targets, []);
+    expect(loggedText()).not.toContain('今回のみ除外');
   });
 
-  it('送信対象 0件のとき "送信対象なし" を表示する', () => {
-    renderPreview([], []);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toContain('送信対象なし');
-  });
-
-  it('skips が空のとき "送信対象外" セクションを出力しない', () => {
-    renderPreview(targets, []);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).not.toContain('送信対象外');
-  });
-
-  it('本文が BODY_PREVIEW_LINES（5行）を超えたとき省略表示する', () => {
-    const longBody = Array.from({ length: 10 }, (_, i) => `行${i + 1}`).join('\n');
-    renderPreview([{ ...targets[0], textBody: longBody }], []);
-    const output = console.log.mock.calls.flat().join('\n');
-    expect(output).toMatch(/全10行/);
+  it('長い件名は省略表示する', () => {
+    const longSubject = 'あ'.repeat(80);
+    renderPreviewTable([{ ...targets[0], subject: longSubject }], []);
+    expect(loggedText()).toContain('…');
   });
 });
 
-// ─── confirmSend ─────────────────────────────────────────────────────────────
+// ─── renderTargetDetail ───────────────────────────────────────────────────────
 
-describe('confirmSend', () => {
-  it('Y を選択した場合 true を返す', async () => {
-    mockPrompt.mockResolvedValueOnce({ confirmed: true });
-    const result = await confirmSend();
-    expect(result).toBe(true);
+describe('renderTargetDetail', () => {
+  it('件名・本文全文・HTML有無を表示する（省略しない）', () => {
+    const longBody = Array.from({ length: 20 }, (_, i) => `行${i + 1}`).join('\n');
+    const target = {
+      company: makeCompany({ companyName: '株式会社詳細' }),
+      subject: '詳細件名',
+      textBody: longBody,
+      htmlBody: '<p>html</p>',
+    };
+    renderTargetDetail(target, 1, 5);
+    const text = loggedText();
+    expect(text).toContain('株式会社詳細');
+    expect(text).toContain('詳細件名');
+    expect(text).toContain('行1');
+    expect(text).toContain('行20');
+    expect(text).toContain('HTML版: あり');
+    expect(text).toContain('[2/5]');
   });
 
-  it('N を選択した場合 false を返す', async () => {
-    mockPrompt.mockResolvedValueOnce({ confirmed: false });
-    const result = await confirmSend();
-    expect(result).toBe(false);
+  it('htmlBody が無い場合は "HTML版: なし" と表示する', () => {
+    const target = {
+      company: makeCompany(),
+      subject: 's',
+      textBody: 't',
+      htmlBody: undefined,
+    };
+    renderTargetDetail(target, 0, 1);
+    expect(loggedText()).toContain('HTML版: なし');
   });
+});
 
-  it('inquirer.prompt を 1 回呼ぶ', async () => {
-    mockPrompt.mockResolvedValueOnce({ confirmed: true });
-    await confirmSend();
-    expect(mockPrompt).toHaveBeenCalledTimes(1);
+// ─── 対話プロンプト ─────────────────────────────────────────────────────────────
+
+describe('promptPreviewAction', () => {
+  it('選択結果を返す', async () => {
+    mockPrompt.mockResolvedValueOnce({ action: 'send' });
+    expect(await promptPreviewAction()).toBe('send');
+  });
+});
+
+describe('promptPreviewNumber', () => {
+  it('1-based の入力を 0-based に変換して返す', async () => {
+    mockPrompt.mockResolvedValueOnce({ number: 2 });
+    expect(await promptPreviewNumber(5)).toBe(1);
+  });
+});
+
+describe('promptDetailAction', () => {
+  it('選択結果を返す', async () => {
+    mockPrompt.mockResolvedValueOnce({ action: 'exclude' });
+    expect(await promptDetailAction()).toBe('exclude');
   });
 });
 
 // ─── runPreview ───────────────────────────────────────────────────────────────
 
 describe('runPreview', () => {
-  it('targets が 0件のとき false を返す（確認プロンプトを出さない）', async () => {
+  it('targets が 0件のときプロンプトを出さず confirmed:false を返す', async () => {
     const companies = [makeCompany({ email: '' })];
     const result = await runPreview(companies, TEMPLATES);
-    expect(result).toBe(false);
+    expect(result).toEqual({ confirmed: false, excludedCompanyIds: [] });
     expect(mockPrompt).not.toHaveBeenCalled();
   });
 
-  it('targets があるとき confirmSend を呼ぶ', async () => {
+  it('「このまま送信する」を選ぶと confirmed:true を返す', async () => {
     const companies = [makeCompany()];
-    mockPrompt.mockResolvedValueOnce({ confirmed: true });
+    mockPrompt.mockResolvedValueOnce({ action: 'send' });
     const result = await runPreview(companies, TEMPLATES);
-    expect(result).toBe(true);
-    expect(mockPrompt).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ confirmed: true, excludedCompanyIds: [] });
   });
 
-  it('N を選択した場合 false を返す', async () => {
+  it('「キャンセル」を選ぶと confirmed:false を返す', async () => {
     const companies = [makeCompany()];
-    mockPrompt.mockResolvedValueOnce({ confirmed: false });
+    mockPrompt.mockResolvedValueOnce({ action: 'cancel' });
     const result = await runPreview(companies, TEMPLATES);
-    expect(result).toBe(false);
+    expect(result).toEqual({ confirmed: false, excludedCompanyIds: [] });
+  });
+
+  it('番号確認 → 一覧に戻る → 送信、で confirmed:true・除外なし', async () => {
+    const companies = [makeCompany()];
+    mockPrompt
+      .mockResolvedValueOnce({ action: 'inspect' })
+      .mockResolvedValueOnce({ number: 1 })
+      .mockResolvedValueOnce({ action: 'back' })
+      .mockResolvedValueOnce({ action: 'send' });
+
+    const result = await runPreview(companies, TEMPLATES);
+
+    expect(result).toEqual({ confirmed: true, excludedCompanyIds: [] });
+  });
+
+  it('番号確認 → 除外 → 送信、で除外した企業のIDが返る', async () => {
+    const companies = [
+      makeCompany({ companyId: 'C000001' }),
+      makeCompany({ companyId: 'C000002', email: 'b@example.com' }),
+    ];
+    mockPrompt
+      .mockResolvedValueOnce({ action: 'inspect' })
+      .mockResolvedValueOnce({ number: 1 })
+      .mockResolvedValueOnce({ action: 'exclude' })
+      .mockResolvedValueOnce({ action: 'send' });
+
+    const result = await runPreview(companies, TEMPLATES);
+
+    expect(result).toEqual({ confirmed: true, excludedCompanyIds: ['C000001'] });
+  });
+
+  it('全社を除外すると自動的に confirmed:false になる', async () => {
+    const companies = [makeCompany({ companyId: 'C000001' })];
+    mockPrompt
+      .mockResolvedValueOnce({ action: 'inspect' })
+      .mockResolvedValueOnce({ number: 1 })
+      .mockResolvedValueOnce({ action: 'exclude' });
+
+    const result = await runPreview(companies, TEMPLATES);
+
+    expect(result).toEqual({ confirmed: false, excludedCompanyIds: ['C000001'] });
+  });
+
+  it('除外後に一覧へ戻ると送信対象件数が更新される', async () => {
+    const companies = [
+      makeCompany({ companyId: 'C000001' }),
+      makeCompany({ companyId: 'C000002', email: 'b@example.com' }),
+    ];
+    mockPrompt
+      .mockResolvedValueOnce({ action: 'inspect' })
+      .mockResolvedValueOnce({ number: 1 })
+      .mockResolvedValueOnce({ action: 'exclude' })
+      .mockResolvedValueOnce({ action: 'send' });
+
+    console.log.mockClear();
+    await runPreview(companies, TEMPLATES);
+
+    const text = loggedText();
+    // 除外後の再描画では送信対象は1件のみになっているはず
+    expect(text).toContain('送信対象 1件');
   });
 });
