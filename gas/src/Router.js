@@ -120,6 +120,12 @@ function syncReplyStatus() {
   return syncReplyStatus_();
 }
 
+// 返信確認タブの「返信を同期」ボタン付近に最終同期日時を表示するための読み取り専用関数。
+function getReplySyncStatus() {
+  requireUser_();
+  return getReplySyncStatus_();
+}
+
 // ⑭AI返信文生成: 受信トレイの本文表示画面から、Geminiで返信文の下書きのみを生成する（Sprint5 Step1）
 function generateReplyDraft(threadId) {
   requireUser_();

@@ -1,12 +1,15 @@
 <section class="sales-management" id="sales-management-root">
   <div class="sales-tabs" id="sales-tabs">
-    <button type="button" class="sales-tabs__tab is-active" data-sales-tab="list">営業リスト</button>
-    <button type="button" class="sales-tabs__tab" data-sales-tab="send">
-      一括送信 <span class="sales-tabs__badge" id="send-tab-badge" hidden>0</span>
-    </button>
-    <button type="button" class="sales-tabs__tab" data-sales-tab="reply">
-      返信確認 <span class="sales-tabs__badge" id="reply-tab-badge" hidden>0</span>
-    </button>
+    <div class="sales-tabs__list">
+      <button type="button" class="sales-tabs__tab is-active" data-sales-tab="list">営業リスト</button>
+      <button type="button" class="sales-tabs__tab" data-sales-tab="send">
+        一括送信 <span class="sales-tabs__badge" id="send-tab-badge" hidden>0</span>
+      </button>
+      <button type="button" class="sales-tabs__tab" data-sales-tab="reply">
+        返信確認 <span class="sales-tabs__badge" id="reply-tab-badge" hidden>0</span>
+      </button>
+    </div>
+    <a class="button button--secondary sales-tabs__add-company" href="#" data-page="search">＋ 企業を追加</a>
   </div>
 
 <div class="company-list sales-tab-panel" id="company-list-root">
@@ -15,37 +18,37 @@
     <button type="button" class="button button--secondary" id="status-undo-button">元に戻す</button>
   </div>
 
-  <form id="filter-form" class="company-list__filters">
-    <input type="text" id="filter-keyword" placeholder="会社名・住所で検索" />
-    <select id="filter-industry">
-      <option value="">業種（すべて）</option>
-    </select>
-    <select id="filter-send-status">
-      <option value="">送信状況（すべて）</option>
-      <option value="未送信">未送信</option>
-      <option value="送信済">送信済</option>
-      <option value="送信失敗">送信失敗</option>
-      <option value="返信あり">返信あり</option>
-      <option value="配信停止">配信停止</option>
-    </select>
-    <select id="filter-send-approval">
-      <option value="">送信可否（すべて）</option>
-      <option value="○">○</option>
-      <option value="×">×</option>
-    </select>
-    <button type="submit" class="button">絞り込む</button>
-    <a class="button button--secondary" href="#" data-page="search">企業検索へ</a>
-    <button type="button" class="button button--secondary" id="bulk-send-button">一括送信</button>
-    <button type="button" class="button button--secondary" id="reply-sync-button">返信確認</button>
-  </form>
+  <div class="company-list__filter-group">
+    <span class="company-list__filter-group-label">絞り込み</span>
+    <form id="filter-form" class="company-list__filters">
+      <input type="text" id="filter-keyword" placeholder="会社名・住所で検索" />
+      <select id="filter-industry">
+        <option value="">業種（すべて）</option>
+      </select>
+      <select id="filter-send-status">
+        <option value="">送信状況（すべて）</option>
+        <option value="未送信">未送信</option>
+        <option value="送信済">送信済</option>
+        <option value="送信失敗">送信失敗</option>
+        <option value="返信あり">返信あり</option>
+        <option value="配信停止">配信停止</option>
+      </select>
+      <select id="filter-send-approval">
+        <option value="">送信可否（すべて）</option>
+        <option value="○">○</option>
+        <option value="×">×</option>
+      </select>
+      <button type="submit" class="button">絞り込む</button>
+    </form>
+  </div>
 
   <div class="company-list__status-filter" id="status-filter">
-    <button type="button" class="button button--secondary is-active" data-status-filter="all">すべて</button>
-    <button type="button" class="button button--secondary" data-status-filter="pendingSend">送信待ち</button>
-    <button type="button" class="button button--secondary" data-status-filter="replied">返信あり</button>
-    <button type="button" class="button button--secondary" data-status-filter="inNegotiation">商談中</button>
-    <button type="button" class="button button--secondary" data-status-filter="todayMeeting">本日商談</button>
-    <button type="button" class="button button--secondary" data-status-filter="won">成約</button>
+    <button type="button" class="status-chip is-active" data-status-filter="all">すべて</button>
+    <button type="button" class="status-chip" data-status-filter="pendingSend">送信待ち</button>
+    <button type="button" class="status-chip" data-status-filter="replied">返信あり</button>
+    <button type="button" class="status-chip" data-status-filter="inNegotiation">商談中</button>
+    <button type="button" class="status-chip" data-status-filter="todayMeeting">本日商談</button>
+    <button type="button" class="status-chip" data-status-filter="won">成約</button>
   </div>
 
   <div class="company-list__selection">
@@ -56,10 +59,11 @@
         <div class="progress-bar__fill" id="bulk-progress-fill"></div>
       </div>
     </div>
-    <div class="company-list__bulk-actions" id="bulk-action-bar" hidden>
-      <button type="button" class="button button--secondary" data-bulk-action="analyze">AI分析</button>
-      <button type="button" class="button button--secondary" data-bulk-action="send">送信</button>
-      <button type="button" class="button button--secondary" data-bulk-action="status">ステータス変更</button>
+    <div class="company-list__bulk-actions" id="bulk-action-bar">
+      <span class="company-list__bulk-actions-label">選択中の企業に：</span>
+      <button type="button" class="button button--secondary" data-bulk-action="analyze" disabled>AI分析</button>
+      <button type="button" class="button" data-bulk-action="send" disabled>送信</button>
+      <button type="button" class="button button--secondary" data-bulk-action="status" disabled>ステータス変更</button>
     </div>
   </div>
 
@@ -174,6 +178,13 @@
 
 <!-- 返信確認タブ（Sprint8④-3）: 新着返信（初回）／継続返信の2サブタブ。 -->
 <div class="sales-tab-panel" id="reply-tab-panel" hidden>
+  <div class="reply-sync-bar">
+    <button type="button" class="button button--secondary" id="reply-sync-button">
+      <span class="reply-sync-bar__icon" aria-hidden="true">⟳</span> 返信を同期
+    </button>
+    <span class="reply-sync-bar__last-synced" id="reply-sync-last-synced"></span>
+  </div>
+
   <div class="sales-subtabs" id="reply-subtabs">
     <button type="button" class="sales-subtabs__tab is-active" data-reply-subtab="new">
       新着返信 <span class="sales-tabs__badge" id="new-reply-subtab-badge" hidden>0</span>
@@ -365,12 +376,15 @@
       });
     }
 
-    // 選択件数表示・一括操作バーの表示/非表示を選択状態に合わせて更新する（画面表示のみ、
-    // 会社データは変更しない）。
+    // 選択件数表示・一括操作ボタンの有効/無効を選択状態に合わせて更新する（画面表示のみ、
+    // 会社データは変更しない）。ボタン自体は常に表示し、未選択時はdisabledにする
+    // （タスク2-4: 「選択が前提の操作」であることをdisabled状態で明示する）。
     function updateSelectionUI() {
       var count = Object.keys(selectedCompanyIds).length;
       selectionCountEl.textContent = '選択中：' + count + '件';
-      bulkActionBarEl.hidden = count === 0;
+      Array.prototype.forEach.call(bulkActionBarEl.querySelectorAll('[data-bulk-action]'), function (button) {
+        button.disabled = count === 0;
+      });
     }
 
     // 表示中ページの行チェックボックスがすべて選択済みかどうかをヘッダーの全選択
@@ -570,97 +584,6 @@
         sendApproval: document.getElementById('filter-send-approval').value,
       };
       loadCompanies(currentFilter);
-    });
-
-    document.getElementById('bulk-send-button').addEventListener('click', function () {
-      var eligibleCount = allCompanies.filter(function (c) {
-        return c.sendApproval === '○' && c.sendStatus !== '送信済';
-      }).length;
-
-      if (eligibleCount === 0) {
-        showToast('送信対象の企業がありません。', 'info');
-        return;
-      }
-
-      var confirmed = window.confirm(
-        '━━━━━━━━━━━━━━━━━━\n' +
-        eligibleCount + '件の営業メールを送信します。\n\n' +
-        '送信後は取り消せません。\n\n' +
-        '送信しますか？\n' +
-        '━━━━━━━━━━━━━━━━━━'
-      );
-      if (!confirmed) {
-        return;
-      }
-
-      var bulkSendButton = document.getElementById('bulk-send-button');
-      var originalText = bulkSendButton.textContent;
-      bulkSendButton.disabled = true;
-      bulkSendButton.classList.add('button--loading');
-      bulkSendButton.textContent = '送信中…';
-      var toast = showToast('送信中…', 'loading', { persist: true });
-
-      google.script.run
-        .withSuccessHandler(function (result) {
-          bulkSendButton.disabled = false;
-          bulkSendButton.classList.remove('button--loading');
-          bulkSendButton.textContent = originalText;
-
-          var message = '送信完了\n\n成功 ' + result.successCount + '件\n失敗 ' + result.failureCount + '件';
-          if (result.failedCompanies && result.failedCompanies.length > 0) {
-            message +=
-              '\n\n失敗企業:\n' +
-              result.failedCompanies
-                .map(function (f) {
-                  return '・' + f.companyName;
-                })
-                .join('\n');
-          }
-          toast.update(message, result.failureCount > 0 ? 'error' : 'success');
-          loadCompanies({});
-        })
-        .withFailureHandler(function (error) {
-          bulkSendButton.disabled = false;
-          bulkSendButton.classList.remove('button--loading');
-          bulkSendButton.textContent = originalText;
-          toast.update('一括送信に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
-        })
-        .sendSalesMailBatch();
-    });
-
-    document.getElementById('reply-sync-button').addEventListener('click', function () {
-      var confirmed = window.confirm(
-        '━━━━━━━━━━━━━━\n' +
-        '返信有無を更新します。\n\n' +
-        '実行しますか？\n' +
-        '━━━━━━━━━━━━━━'
-      );
-      if (!confirmed) {
-        return;
-      }
-
-      var replySyncButton = document.getElementById('reply-sync-button');
-      var originalText = replySyncButton.textContent;
-      replySyncButton.disabled = true;
-      replySyncButton.classList.add('button--loading');
-      replySyncButton.textContent = '確認中…';
-      var toast = showToast('返信を確認しています…', 'loading', { persist: true });
-
-      google.script.run
-        .withSuccessHandler(function (result) {
-          replySyncButton.disabled = false;
-          replySyncButton.classList.remove('button--loading');
-          replySyncButton.textContent = originalText;
-          toast.update('更新 ' + result.updatedCount + '件', 'success');
-          loadCompanies({});
-        })
-        .withFailureHandler(function (error) {
-          replySyncButton.disabled = false;
-          replySyncButton.classList.remove('button--loading');
-          replySyncButton.textContent = originalText;
-          toast.update('返信確認に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
-        })
-        .syncReplyStatus();
     });
 
     // 単体AI分析（AI分析ボタン押下時の処理）。onDoneを渡した場合は失敗時のalertを出さず、
@@ -1563,7 +1486,58 @@
       setActiveReplySubtab(btn.getAttribute('data-reply-subtab'));
     });
 
+    // 「返信を同期」ボタン（syncReplyStatus()の唯一の起点）。以前はフィルター行にあったが、
+    // 返信確認タブへ移設した（タスク2でタブ導線と重複するボタンを整理した際、この同期処理は
+    // 単なる画面遷移ではなく実処理のため、返信確認タブ内に残すことにした）。
+    var replySyncButton = document.getElementById('reply-sync-button');
+    var replySyncLastSyncedEl = document.getElementById('reply-sync-last-synced');
+
+    function formatLastSyncedLabel(lastSyncedAt) {
+      return lastSyncedAt ? '最終同期：' + lastSyncedAt : '最終同期：まだ実行されていません';
+    }
+
+    function loadReplySyncStatus() {
+      google.script.run
+        .withSuccessHandler(function (status) {
+          replySyncLastSyncedEl.textContent = formatLastSyncedLabel(status && status.lastSyncedAt);
+        })
+        .withFailureHandler(function () {
+          replySyncLastSyncedEl.textContent = '';
+        })
+        .getReplySyncStatus();
+    }
+
+    replySyncButton.addEventListener('click', function () {
+      var originalHtml = replySyncButton.innerHTML;
+      replySyncButton.disabled = true;
+      replySyncButton.classList.add('button--loading');
+      replySyncButton.textContent = '同期中…';
+      var toast = showToast('返信を同期しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          replySyncButton.disabled = false;
+          replySyncButton.classList.remove('button--loading');
+          replySyncButton.innerHTML = originalHtml;
+          toast.update((result && result.updatedCount || 0) + '件の新着返信を取得しました', 'success');
+          replySyncLastSyncedEl.textContent = formatLastSyncedLabel(result && result.lastSyncedAt);
+          loadNewReplyTab();
+          if (replyOngoingLoaded) {
+            loadOngoingReplyTab();
+          }
+          loadCompanies(currentFilter);
+        })
+        .withFailureHandler(function (error) {
+          replySyncButton.disabled = false;
+          replySyncButton.classList.remove('button--loading');
+          replySyncButton.innerHTML = originalHtml;
+          toast.update('返信の同期に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .syncReplyStatus();
+    });
+
     function loadReplyTab() {
+      loadReplySyncStatus();
       loadNewReplyTab();
     }
 

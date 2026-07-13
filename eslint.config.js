@@ -60,6 +60,7 @@ const gasProjectGlobals = {
   getGeminiApiKey_: 'readonly',
   getGeminiModel_: 'readonly',
   getMapsApiKey_: 'readonly',
+  getReplySyncStatus_: 'readonly',
   getReplyTemplates_: 'readonly',
   getReportStats_: 'readonly',
   getSalesPerson_: 'readonly',

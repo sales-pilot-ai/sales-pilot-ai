@@ -368,12 +368,32 @@
     color: var(--color-text-muted);
   }
 
+  /* タスク2-2: 検索ボックス・業種・送信状況・送信可否・絞り込むボタンを
+     「絞り込み」の1グループとして視覚的にまとめる。 */
+  .company-list__filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    background: var(--color-surface-muted);
+    border-radius: 8px;
+  }
+
+  .company-list__filter-group-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
   .company-list__filters {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 12px;
-    margin-bottom: 24px;
+    flex: 1;
   }
 
   .company-table {
@@ -407,6 +427,28 @@
     margin-bottom: 16px;
   }
 
+  /* タスク2-3: ステータス絞り込みは「押すと何かが実行されるボタン」とは見た目を
+     明確に分け、チップ／トグル風（角丸大きめ・薄背景・選択中のみ塗り）にする。 */
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-muted);
+    color: var(--color-text-muted);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .status-chip.is-active {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #fff;
+    font-weight: 700;
+  }
+
   .company-list__selection {
     display: flex;
     flex-wrap: wrap;
@@ -418,7 +460,16 @@
   .company-list__bulk-actions {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
+  }
+
+  /* タスク2-4: 「選択した企業に対する操作」であることを明示する小見出し。 */
+  .company-list__bulk-actions-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    white-space: nowrap;
   }
 
   .company-list__bulk-progress {
@@ -457,6 +508,23 @@
     gap: 8px;
     margin-bottom: 20px;
     border-bottom: 1px solid var(--color-border);
+  }
+
+  /* タスク2-1: 「企業を追加」導線をタブ行の右端に配置するため、.sales-tabsのみ
+     両端揃えにする（.sales-subtabsは従来通りタブの並びのみ）。 */
+  .sales-tabs {
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .sales-tabs__list {
+    display: flex;
+    gap: 8px;
+  }
+
+  .sales-tabs__add-company {
+    margin-bottom: 8px;
   }
 
   .sales-tabs__tab,
@@ -500,6 +568,23 @@
     align-items: center;
     gap: 12px;
     margin-bottom: 16px;
+  }
+
+  /* 返信を同期ボタン（タスクA: 返信同期機能の復活）。 */
+  .reply-sync-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .reply-sync-bar__icon {
+    display: inline-block;
+  }
+
+  .reply-sync-bar__last-synced {
+    font-size: 12px;
+    color: var(--color-text-muted);
   }
 
   .reply-new-list {
@@ -1031,6 +1116,19 @@
     .company-list__filters {
       flex-direction: column;
       align-items: stretch;
+    }
+
+    .company-list__filter-group {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .sales-tabs {
+      align-items: stretch;
+    }
+
+    .sales-tabs__add-company {
+      text-align: center;
     }
 
     .company-table {
