@@ -25,13 +25,30 @@ function getPermissionSheet_() {
   return sheet;
 }
 
+// ヘッダーセルの前後に不可視の空白が混入していても列を正しく照合できるよう、
+// トリムしてからbuildHeaderIndex_（共通関数）に渡す（タスクB: ヘッダー名不一致対策）。
+function buildPermissionHeaderIndex_(headerRow) {
+  return buildHeaderIndex_(
+    headerRow.map(function (header) {
+      return String(header || '').trim();
+    })
+  );
+}
+
+// Sheetsが日付として解釈した値はDateオブジェクトで返ってくるため、google.script.runで
+// シリアライズできるよう文字列に変換する（MapperService.jsのrowToCompany_と同じ対処。
+// タスクB: Dateシリアライズ対策）。
+function formatPermissionDateValue_(value) {
+  return value instanceof Date ? Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss') : value;
+}
+
 function rowToUser_(headerIndex, row) {
   return {
     email: row[headerIndex['メールアドレス']],
     name: row[headerIndex['名前']],
     role: row[headerIndex['権限']],
-    createdAt: row[headerIndex['作成日時']],
-    lastLoginAt: row[headerIndex['最終ログイン日時']],
+    createdAt: formatPermissionDateValue_(row[headerIndex['作成日時']]),
+    lastLoginAt: formatPermissionDateValue_(row[headerIndex['最終ログイン日時']]),
   };
 }
 
@@ -43,7 +60,7 @@ function listUsers_() {
     return [];
   }
   var values = sheet.getRange(1, 1, lastRow, sheet.getLastColumn()).getValues();
-  var headerIndex = buildHeaderIndex_(values[0]);
+  var headerIndex = buildPermissionHeaderIndex_(values[0]);
   var users = [];
   for (var i = 1; i < values.length; i++) {
     users.push(rowToUser_(headerIndex, values[i]));
@@ -56,7 +73,7 @@ function findUserRowIndexByEmail_(sheet, email) {
   if (lastRow < 2) {
     return -1;
   }
-  var emailCol = buildHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0])['メールアドレス'];
+  var emailCol = buildPermissionHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0])['メールアドレス'];
   var emails = sheet.getRange(2, emailCol + 1, lastRow - 1, 1).getValues();
   var target = String(email || '').trim().toLowerCase();
   for (var i = 0; i < emails.length; i++) {
@@ -96,12 +113,14 @@ function getCurrentUserContext_() {
   lock.waitLock(30000);
   try {
     var sheet = getPermissionSheet_();
-    var users = listUsers_();
 
-    if (users.length === 0) {
+    // ユーザーの有無はlistUsers_()の呼び出し結果ではなく、シートの行数で直接判定する
+    // （タスクB: listUsers_()の全件読み取り・整形処理にbootstrap判定を依存させない）。
+    if (sheet.getLastRow() < 2) {
       var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-      sheet.appendRow([email, email, USER_ROLE.ADMIN, now, now]);
-      return { email: email, name: email, role: USER_ROLE.ADMIN };
+      var defaultName = String(email).split('@')[0];
+      sheet.appendRow([email, defaultName, USER_ROLE.ADMIN, now, now]);
+      return { email: email, name: defaultName, role: USER_ROLE.ADMIN };
     }
 
     var rowIndex = findUserRowIndexByEmail_(sheet, email);
@@ -109,7 +128,7 @@ function getCurrentUserContext_() {
       return null;
     }
 
-    var headerIndex = buildHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+    var headerIndex = buildPermissionHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
     var lastLoginCol = headerIndex['最終ログイン日時'];
     var loginNow = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
     sheet.getRange(rowIndex, lastLoginCol + 1).setValue(loginNow);
@@ -183,7 +202,7 @@ function updateUserRole_(email, role) {
     if (target.role === USER_ROLE.ADMIN && role === USER_ROLE.USER && countAdmins_(users) <= 1) {
       throw new Error('最後の1人のAdminの権限は変更できません。先に他のユーザーをAdminに設定してください。');
     }
-    var headerIndex = buildHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+    var headerIndex = buildPermissionHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
     sheet.getRange(rowIndex, headerIndex['権限'] + 1).setValue(role);
     return findUserByEmail_(email);
   } finally {
