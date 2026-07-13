@@ -255,8 +255,10 @@ function upsertCompanyCandidate_(candidate) {
 
     var companyId = nextCompanyId_(data);
     var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+    // 企業検索の候補（candidate）は返信有無を持たないため、空欄のまま保存されないよう
+    // 明示的に初期値を設定する（タスクC）。candidateが万一hasReplyを持つ場合はそちらを優先する。
     var row = companyToRow_(
-      Object.assign({}, candidate, {
+      Object.assign({ hasReply: HAS_REPLY.NO }, candidate, {
         companyId: companyId,
         updatedAt: now,
       })
@@ -266,4 +268,29 @@ function upsertCompanyCandidate_(candidate) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// タスクC: 既存の営業リストで「返信有無」が空欄の行にのみ初期値（HAS_REPLY.NO）を補完する
+// 一括マイグレーション。既に何らかの値（'返信あり'等）が入っている行は絶対に上書きしない。
+// Apps Scriptエディタの実行欄から手動で一度だけ実行する想定（Router経由では公開しない）。
+function backfillMissingHasReply_() {
+  var sheet = getCompanySheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return { updatedCount: 0 };
+  }
+  var headerIndex = buildHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+  var hasReplyCol = headerIndex['返信有無'];
+  if (hasReplyCol === undefined) {
+    return { updatedCount: 0 };
+  }
+  var values = sheet.getRange(2, hasReplyCol + 1, lastRow - 1, 1).getValues();
+  var updatedCount = 0;
+  for (var i = 0; i < values.length; i++) {
+    if (!values[i][0]) {
+      sheet.getRange(i + 2, hasReplyCol + 1).setValue(HAS_REPLY.NO);
+      updatedCount += 1;
+    }
+  }
+  return { updatedCount: updatedCount };
 }

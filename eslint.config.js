@@ -68,6 +68,7 @@ const gasProjectGlobals = {
   getSettingsForAdmin_: 'readonly',
   getSpreadsheetId_: 'readonly',
   getTimeRexUrl_: 'readonly',
+  HAS_REPLY: 'readonly',
   listAvailableGeminiModels_: 'readonly',
   listCompaniesFromSheet_: 'readonly',
   listCompanyMailHistory_: 'readonly',

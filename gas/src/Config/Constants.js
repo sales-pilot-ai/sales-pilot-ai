@@ -49,6 +49,14 @@ var DEAL_RESULT = {
   LOST: '失注',
 };
 
+// 返信有無（タスクC）。企業検索からの新規保存時に明示的にNOを設定し、空欄のまま
+// 保存されることを防ぐ（既存ロジックは引き続きc.hasReply === HAS_REPLY.YESでのみ判定するため、
+// 空欄との互換性は保たれる）。
+var HAS_REPLY = {
+  YES: '返信あり',
+  NO: '未返信',
+};
+
 // 保存済み企業を検索候補保存で上書きしてはいけない列（現行CLI版のPROTECTED_FIELDS相当）
 var COMPANY_PROTECTED_HEADERS = [
   '企業ID',
