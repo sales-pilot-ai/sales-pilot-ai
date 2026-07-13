@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <script>
+      // IFRAMEサンドボックスでは初回表示後にトップレベルURLがgoogleusercontent.comの
+      // サンドボックスURL(userCodeAppPanel等)に変わり、相対リンク（href="?page=xxx"）が
+      // そちらを基準に解決されてしまう。そのため画面遷移はJavaScriptから
+      // window.open(url, '_top') で絶対URL（exec URL）へ行う。
+      var APP_BASE_URL = '<?= baseUrl ?>';
+
+      function navigateToPage(page) {
+        window.open(APP_BASE_URL + '?page=' + encodeURIComponent(page), '_top');
+      }
+    </script>
+    <?!= include('Views/Style'); ?>
+  </head>
+  <body>
+    <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+    <header class="app-header">
+      <div class="app-header__brand"><span aria-hidden="true">📊</span> Sales Pilot AI</div>
+      <nav class="app-nav" id="app-nav">
+        <a class="app-nav__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard">ホーム</a>
+        <a class="app-nav__link<?= page === 'search' ? ' is-active' : '' ?>" href="#" data-page="search">企業検索</a>
+        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList">営業リスト</a>
+        <a class="app-nav__link<?= page === 'inbox' ? ' is-active' : '' ?>" href="#" data-page="inbox">受信トレイ</a>
+        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList" title="営業リスト画面の一括送信から実行できます">一括送信</a>
+        <a class="app-nav__link<?= page === 'templates' ? ' is-active' : '' ?>" href="#" data-page="templates">テンプレート</a>
+        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList" title="営業リスト画面の返信確認から実行できます">返信確認</a>
+        <a class="app-nav__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard" title="Dashboard画面の本日フォローすべき企業から確認できます">フォローアップ</a>
+        <a class="app-nav__link<?= page === 'report' ? ' is-active' : '' ?>" href="#" data-page="report">レポート</a>
+        <a class="app-nav__link<?= page === 'settings' ? ' is-active' : '' ?>" href="#" data-page="settings">設定</a>
+      </nav>
+      <div class="app-header__user" id="current-user">読み込み中…</div>
+      <button class="app-header__menu-toggle" id="menu-toggle" aria-label="メニュー">☰</button>
+    </header>
+
+    <main class="app-main">
+      <?!= include(pageTemplate); ?>
+    </main>
+
+    <script>
+      // 通知UI（Sprint6③）。alert()の代わりに使う共通トースト。成功/エラー/情報/処理中の
+      // 4種類のタイプを持つ。処理中トーストはpersist:trueで自動では消えず、非同期処理の完了時に
+      // update()で成功/エラー表示へ差し替える運用を想定する（例: showToast()で「処理中」を出し、
+      // 完了時にhandle.update('完了しました', 'success')を呼ぶ）。
+      // 各画面（Dashboard/CompanyList/Inbox等）の<script>から共通で呼び出せるようwindowに公開する。
+      function showToast(message, type, options) {
+        type = type || 'info';
+        options = options || {};
+        var container = document.getElementById('toast-container');
+        var el = document.createElement('div');
+        el.className = 'toast toast--' + type;
+        el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        el.textContent = message;
+        container.appendChild(el);
+
+        var timeoutId = null;
+
+        function scheduleAutoClose(opts) {
+          if (opts.persist) {
+            return;
+          }
+          timeoutId = setTimeout(close, opts.duration || (type === 'error' ? 5000 : 3000));
+        }
+
+        function close() {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (el.parentNode) {
+            el.parentNode.removeChild(el);
+          }
+        }
+
+        scheduleAutoClose(options);
+
+        return {
+          update: function (newMessage, newType, newOptions) {
+            newOptions = newOptions || {};
+            if (timeoutId) {
+              clearTimeout(timeoutId);
+              timeoutId = null;
+            }
+            type = newType || type;
+            el.className = 'toast toast--' + type;
+            el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+            el.textContent = newMessage;
+            scheduleAutoClose(newOptions);
+          },
+          close: close,
+        };
+      }
+      window.showToast = showToast;
+
+      document.getElementById('menu-toggle').addEventListener('click', function () {
+        document.getElementById('app-nav').classList.toggle('is-open');
+      });
+
+      // data-page属性を持つリンクはすべてこのハンドラーで absolute URL 遷移する
+      // （Dashboard.html / CompanyList.html 等、includeされた画面内のリンクも対象）。
+      document.body.addEventListener('click', function (event) {
+        var link = event.target.closest('[data-page]');
+        if (!link) {
+          return;
+        }
+        event.preventDefault();
+        navigateToPage(link.getAttribute('data-page'));
+      });
+
+      google.script.run
+        .withSuccessHandler(function (user) {
+          var el = document.getElementById('current-user');
+          el.textContent = user && user.email ? user.email : 'ログイン情報を取得できませんでした';
+        })
+        .withFailureHandler(function (error) {
+          document.getElementById('current-user').textContent = 'ログイン情報の取得に失敗しました';
+          console.error(error);
+        })
+        .getCurrentUser();
+    </script>
+  </body>
+</html>

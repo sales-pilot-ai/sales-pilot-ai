@@ -1,0 +1,485 @@
+<section class="templates">
+  <div class="templates__section">
+    <div class="templates__section-header">
+      <h2>営業メールテンプレート</h2>
+      <button type="button" class="button" id="sales-template-create-button">新規作成</button>
+    </div>
+    <p id="sales-template-loading" class="empty-state">読み込み中…</p>
+    <p id="sales-template-error" class="error-message" hidden></p>
+    <table class="company-table" id="sales-template-table" hidden>
+      <thead>
+        <tr>
+          <th>表示名</th>
+          <th>件名</th>
+          <th>デフォルト</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="sales-template-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="templates__section">
+    <div class="templates__section-header">
+      <h2>返信テンプレート</h2>
+      <button type="button" class="button" id="reply-template-create-button">新規作成</button>
+    </div>
+    <p id="reply-template-loading" class="empty-state">読み込み中…</p>
+    <p id="reply-template-error" class="error-message" hidden></p>
+    <table class="company-table" id="reply-template-table" hidden>
+      <thead>
+        <tr>
+          <th>表示名</th>
+          <th>本文（冒頭）</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="reply-template-table-body"></tbody>
+    </table>
+  </div>
+
+  <div class="modal-overlay" id="sales-template-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="sales-template-modal-close" aria-label="閉じる">×</button>
+      <h2 id="sales-template-modal-title">営業メールテンプレート</h2>
+      <label>表示名</label>
+      <input type="text" id="sales-template-display-name" />
+      <label>件名</label>
+      <input type="text" id="sales-template-subject" />
+      <label>本文テンプレート</label>
+      <p class="templates__placeholder-hint">
+        差し込み可能なタグ: <code>{{personalizedNote}}</code> <code>{{salesPersonName}}</code>
+        <code>{{salesPersonTel}}</code> <code>{{salesPersonMail}}</code> <code>{{timeRexUrl}}</code>
+      </p>
+      <textarea id="sales-template-body" rows="16"></textarea>
+      <div class="company-list__bulk-actions">
+        <button type="button" class="button button--secondary" id="sales-template-modal-cancel">キャンセル</button>
+        <button type="button" class="button" id="sales-template-modal-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="reply-template-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="reply-template-modal-close" aria-label="閉じる">×</button>
+      <h2 id="reply-template-modal-title">返信テンプレート</h2>
+      <label>表示名</label>
+      <input type="text" id="reply-template-display-name" />
+      <label>本文</label>
+      <textarea id="reply-template-body" rows="10"></textarea>
+      <div class="company-list__bulk-actions">
+        <button type="button" class="button button--secondary" id="reply-template-modal-cancel">キャンセル</button>
+        <button type="button" class="button" id="reply-template-modal-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="template-preview-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="template-preview-modal-close" aria-label="閉じる">×</button>
+      <h2>プレビュー</h2>
+      <p class="empty-state">差し込みタグは実際の値に置き換わらず、そのまま表示されます。</p>
+      <p id="template-preview-subject-row" hidden><strong>件名:</strong> <span id="template-preview-subject"></span></p>
+      <pre id="template-preview-body" class="templates__preview-body"></pre>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var salesTemplates = [];
+    var replyTemplates = [];
+    var salesTemplateModalMode = 'create';
+    var salesTemplateEditingId = null;
+    var replyTemplateModalMode = 'create';
+    var replyTemplateEditingId = null;
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function firstLine(text) {
+      var line = String(text || '').split('\n')[0];
+      return line.length > 40 ? line.slice(0, 40) + '…' : line;
+    }
+
+    // --- 営業メールテンプレート ---
+
+    var salesLoadingEl = document.getElementById('sales-template-loading');
+    var salesErrorEl = document.getElementById('sales-template-error');
+    var salesTableEl = document.getElementById('sales-template-table');
+    var salesTbody = document.getElementById('sales-template-table-body');
+    var salesModal = document.getElementById('sales-template-modal');
+    var salesModalTitle = document.getElementById('sales-template-modal-title');
+    var salesDisplayNameInput = document.getElementById('sales-template-display-name');
+    var salesSubjectInput = document.getElementById('sales-template-subject');
+    var salesBodyInput = document.getElementById('sales-template-body');
+
+    function loadSalesTemplates() {
+      salesLoadingEl.hidden = false;
+      salesErrorEl.hidden = true;
+      salesTableEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (templates) {
+          salesLoadingEl.hidden = true;
+          salesTemplates = templates || [];
+          renderSalesTemplateTable();
+        })
+        .withFailureHandler(function (error) {
+          salesLoadingEl.hidden = true;
+          salesErrorEl.hidden = false;
+          salesErrorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .listSalesTemplates();
+    }
+
+    function renderSalesTemplateTable() {
+      if (salesTemplates.length === 0) {
+        salesTableEl.hidden = true;
+        return;
+      }
+      salesTableEl.hidden = false;
+      salesTbody.innerHTML = salesTemplates
+        .map(function (t) {
+          return (
+            '<tr data-template-id="' + escapeHtml(t.templateId) + '">' +
+            '<td>' + escapeHtml(t.displayName) + '</td>' +
+            '<td>' + escapeHtml(t.subject) + '</td>' +
+            '<td>' + (t.isDefault ? 'デフォルト' : '') + '</td>' +
+            '<td class="company-table__ai-actions">' +
+            '<button type="button" class="button button--secondary" data-action="preview">プレビュー</button>' +
+            '<button type="button" class="button button--secondary" data-action="edit">編集</button>' +
+            (t.isDefault
+              ? ''
+              : '<button type="button" class="button button--secondary" data-action="set-default">デフォルトに設定</button>' +
+                '<button type="button" class="button button--secondary" data-action="delete">削除</button>') +
+            '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    }
+
+    function findSalesTemplate(templateId) {
+      return salesTemplates.filter(function (t) {
+        return t.templateId === templateId;
+      })[0];
+    }
+
+    function openSalesTemplateModal(mode, template) {
+      salesTemplateModalMode = mode;
+      salesTemplateEditingId = template ? template.templateId : null;
+      salesModalTitle.textContent = mode === 'create' ? '営業メールテンプレートを新規作成' : '営業メールテンプレートを編集';
+      salesDisplayNameInput.value = template ? template.displayName : '';
+      salesSubjectInput.value = template ? template.subject : '';
+      salesBodyInput.value = template ? template.bodyTemplate : '';
+      salesModal.hidden = false;
+    }
+
+    function closeSalesTemplateModal() {
+      salesModal.hidden = true;
+    }
+
+    document.getElementById('sales-template-create-button').addEventListener('click', function () {
+      openSalesTemplateModal('create', null);
+    });
+
+    document.getElementById('sales-template-modal-close').addEventListener('click', closeSalesTemplateModal);
+    document.getElementById('sales-template-modal-cancel').addEventListener('click', closeSalesTemplateModal);
+    salesModal.addEventListener('click', function (event) {
+      if (event.target === salesModal) {
+        closeSalesTemplateModal();
+      }
+    });
+
+    document.getElementById('sales-template-modal-save').addEventListener('click', function () {
+      var data = {
+        displayName: salesDisplayNameInput.value,
+        subject: salesSubjectInput.value,
+        bodyTemplate: salesBodyInput.value,
+      };
+      if (!data.displayName || !data.subject || !data.bodyTemplate) {
+        showToast('表示名・件名・本文テンプレートはすべて入力してください。', 'info');
+        return;
+      }
+
+      var saveButton = document.getElementById('sales-template-modal-save');
+      saveButton.disabled = true;
+      saveButton.classList.add('button--loading');
+      var toast = showToast('保存しています…', 'loading', { persist: true });
+
+      var request =
+        salesTemplateModalMode === 'create'
+          ? google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFailed).createSalesTemplate(data)
+          : google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFailed).updateSalesTemplate(salesTemplateEditingId, data);
+
+      function onSaved() {
+        saveButton.disabled = false;
+        saveButton.classList.remove('button--loading');
+        toast.update('保存しました。', 'success');
+        closeSalesTemplateModal();
+        loadSalesTemplates();
+      }
+
+      function onFailed(error) {
+        saveButton.disabled = false;
+        saveButton.classList.remove('button--loading');
+        toast.update('保存に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+      }
+
+      return request;
+    });
+
+    salesTbody.addEventListener('click', function (event) {
+      var row = event.target.closest('tr[data-template-id]');
+      if (!row) {
+        return;
+      }
+      var templateId = row.getAttribute('data-template-id');
+      var template = findSalesTemplate(templateId);
+      if (!template) {
+        return;
+      }
+
+      var editBtn = event.target.closest('[data-action="edit"]');
+      if (editBtn) {
+        openSalesTemplateModal('edit', template);
+        return;
+      }
+
+      var previewBtn = event.target.closest('[data-action="preview"]');
+      if (previewBtn) {
+        openPreviewModal(template.subject, template.bodyTemplate);
+        return;
+      }
+
+      var setDefaultBtn = event.target.closest('[data-action="set-default"]');
+      if (setDefaultBtn) {
+        var toast = showToast('デフォルトに設定しています…', 'loading', { persist: true });
+        google.script.run
+          .withSuccessHandler(function () {
+            toast.update('デフォルトテンプレートを変更しました。', 'success');
+            loadSalesTemplates();
+          })
+          .withFailureHandler(function (error) {
+            toast.update('デフォルト設定に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .setDefaultSalesTemplate(templateId);
+        return;
+      }
+
+      var deleteBtn = event.target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        var confirmed = window.confirm('テンプレート「' + template.displayName + '」を削除します。\nよろしいですか？');
+        if (!confirmed) {
+          return;
+        }
+        var deleteToast = showToast('削除しています…', 'loading', { persist: true });
+        google.script.run
+          .withSuccessHandler(function () {
+            deleteToast.update('削除しました。', 'success');
+            loadSalesTemplates();
+          })
+          .withFailureHandler(function (error) {
+            deleteToast.update('削除に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .deleteSalesTemplate(templateId);
+      }
+    });
+
+    // --- 返信テンプレート ---
+
+    var replyLoadingEl = document.getElementById('reply-template-loading');
+    var replyErrorEl = document.getElementById('reply-template-error');
+    var replyTableEl = document.getElementById('reply-template-table');
+    var replyTbody = document.getElementById('reply-template-table-body');
+    var replyModal = document.getElementById('reply-template-modal');
+    var replyModalTitle = document.getElementById('reply-template-modal-title');
+    var replyDisplayNameInput = document.getElementById('reply-template-display-name');
+    var replyBodyInput = document.getElementById('reply-template-body');
+
+    function loadReplyTemplates() {
+      replyLoadingEl.hidden = false;
+      replyErrorEl.hidden = true;
+      replyTableEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (templates) {
+          replyLoadingEl.hidden = true;
+          replyTemplates = templates || [];
+          renderReplyTemplateTable();
+        })
+        .withFailureHandler(function (error) {
+          replyLoadingEl.hidden = true;
+          replyErrorEl.hidden = false;
+          replyErrorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .getReplyTemplates();
+    }
+
+    function renderReplyTemplateTable() {
+      if (replyTemplates.length === 0) {
+        replyTableEl.hidden = true;
+        return;
+      }
+      replyTableEl.hidden = false;
+      replyTbody.innerHTML = replyTemplates
+        .map(function (t) {
+          return (
+            '<tr data-template-id="' + escapeHtml(t.templateId) + '">' +
+            '<td>' + escapeHtml(t.displayName) + '</td>' +
+            '<td>' + escapeHtml(firstLine(t.body)) + '</td>' +
+            '<td class="company-table__ai-actions">' +
+            '<button type="button" class="button button--secondary" data-action="preview">プレビュー</button>' +
+            '<button type="button" class="button button--secondary" data-action="edit">編集</button>' +
+            '<button type="button" class="button button--secondary" data-action="delete">削除</button>' +
+            '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    }
+
+    function findReplyTemplate(templateId) {
+      return replyTemplates.filter(function (t) {
+        return t.templateId === templateId;
+      })[0];
+    }
+
+    function openReplyTemplateModal(mode, template) {
+      replyTemplateModalMode = mode;
+      replyTemplateEditingId = template ? template.templateId : null;
+      replyModalTitle.textContent = mode === 'create' ? '返信テンプレートを新規作成' : '返信テンプレートを編集';
+      replyDisplayNameInput.value = template ? template.displayName : '';
+      replyBodyInput.value = template ? template.body : '';
+      replyModal.hidden = false;
+    }
+
+    function closeReplyTemplateModal() {
+      replyModal.hidden = true;
+    }
+
+    document.getElementById('reply-template-create-button').addEventListener('click', function () {
+      openReplyTemplateModal('create', null);
+    });
+
+    document.getElementById('reply-template-modal-close').addEventListener('click', closeReplyTemplateModal);
+    document.getElementById('reply-template-modal-cancel').addEventListener('click', closeReplyTemplateModal);
+    replyModal.addEventListener('click', function (event) {
+      if (event.target === replyModal) {
+        closeReplyTemplateModal();
+      }
+    });
+
+    document.getElementById('reply-template-modal-save').addEventListener('click', function () {
+      var data = {
+        displayName: replyDisplayNameInput.value,
+        body: replyBodyInput.value,
+      };
+      if (!data.displayName || !data.body) {
+        showToast('表示名・本文はすべて入力してください。', 'info');
+        return;
+      }
+
+      var saveButton = document.getElementById('reply-template-modal-save');
+      saveButton.disabled = true;
+      saveButton.classList.add('button--loading');
+      var toast = showToast('保存しています…', 'loading', { persist: true });
+
+      function onSaved() {
+        saveButton.disabled = false;
+        saveButton.classList.remove('button--loading');
+        toast.update('保存しました。', 'success');
+        closeReplyTemplateModal();
+        loadReplyTemplates();
+      }
+
+      function onFailed(error) {
+        saveButton.disabled = false;
+        saveButton.classList.remove('button--loading');
+        toast.update('保存に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+      }
+
+      if (replyTemplateModalMode === 'create') {
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFailed).createReplyTemplate(data);
+      } else {
+        google.script.run.withSuccessHandler(onSaved).withFailureHandler(onFailed).updateReplyTemplate(replyTemplateEditingId, data);
+      }
+    });
+
+    replyTbody.addEventListener('click', function (event) {
+      var row = event.target.closest('tr[data-template-id]');
+      if (!row) {
+        return;
+      }
+      var templateId = row.getAttribute('data-template-id');
+      var template = findReplyTemplate(templateId);
+      if (!template) {
+        return;
+      }
+
+      var editBtn = event.target.closest('[data-action="edit"]');
+      if (editBtn) {
+        openReplyTemplateModal('edit', template);
+        return;
+      }
+
+      var previewBtn = event.target.closest('[data-action="preview"]');
+      if (previewBtn) {
+        openPreviewModal(null, template.body);
+        return;
+      }
+
+      var deleteBtn = event.target.closest('[data-action="delete"]');
+      if (deleteBtn) {
+        var confirmed = window.confirm('テンプレート「' + template.displayName + '」を削除します。\nよろしいですか？');
+        if (!confirmed) {
+          return;
+        }
+        var toast = showToast('削除しています…', 'loading', { persist: true });
+        google.script.run
+          .withSuccessHandler(function () {
+            toast.update('削除しました。', 'success');
+            loadReplyTemplates();
+          })
+          .withFailureHandler(function (error) {
+            toast.update('削除に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .deleteReplyTemplate(templateId);
+      }
+    });
+
+    // --- プレビュー（営業メール・返信共用） ---
+
+    var previewModal = document.getElementById('template-preview-modal');
+    var previewSubjectRow = document.getElementById('template-preview-subject-row');
+    var previewSubject = document.getElementById('template-preview-subject');
+    var previewBody = document.getElementById('template-preview-body');
+
+    function openPreviewModal(subject, body) {
+      if (subject) {
+        previewSubjectRow.hidden = false;
+        previewSubject.textContent = subject;
+      } else {
+        previewSubjectRow.hidden = true;
+      }
+      previewBody.textContent = body;
+      previewModal.hidden = false;
+    }
+
+    document.getElementById('template-preview-modal-close').addEventListener('click', function () {
+      previewModal.hidden = true;
+    });
+    previewModal.addEventListener('click', function (event) {
+      if (event.target === previewModal) {
+        previewModal.hidden = true;
+      }
+    });
+
+    loadSalesTemplates();
+    loadReplyTemplates();
+  })();
+</script>

@@ -1,0 +1,183 @@
+<section class="dashboard">
+  <div class="dashboard__cards" id="dashboard-cards">
+    <div class="card card--clickable" data-status-quick-filter="replied" role="button" tabindex="0" aria-label="返信ありの企業を営業リストで見る">
+      <div class="card__icon" aria-hidden="true">💬</div>
+      <div class="card__value" id="stat-replied">—</div>
+      <div class="card__label">返信あり</div>
+    </div>
+    <div class="card card--clickable" data-status-quick-filter="pendingSend" role="button" tabindex="0" aria-label="送信待ちの企業を営業リストで見る">
+      <div class="card__icon" aria-hidden="true">📤</div>
+      <div class="card__value" id="stat-pending-send">—</div>
+      <div class="card__label">送信待ち</div>
+    </div>
+    <div class="card card--clickable" data-status-quick-filter="inNegotiation" role="button" tabindex="0" aria-label="商談中の企業を営業リストで見る">
+      <div class="card__icon" aria-hidden="true">🤝</div>
+      <div class="card__value" id="stat-in-negotiation">—</div>
+      <div class="card__label">商談中</div>
+    </div>
+    <div class="card card--clickable" data-status-quick-filter="todayMeeting" role="button" tabindex="0" aria-label="本日のアクション対象企業を営業リストで見る">
+      <div class="card__icon" aria-hidden="true">📅</div>
+      <div class="card__value" id="stat-today-action">—</div>
+      <div class="card__label">本日のアクション</div>
+    </div>
+    <div class="card card--clickable" data-status-quick-filter="won" role="button" tabindex="0" aria-label="成約企業を営業リストで見る">
+      <div class="card__icon" aria-hidden="true">🏆</div>
+      <div class="card__value" id="stat-won">—</div>
+      <div class="card__label">成約</div>
+    </div>
+  </div>
+
+  <div class="dashboard__metrics" id="dashboard-metrics">
+    <div class="card card--metric">
+      <div class="card__icon" aria-hidden="true">💬</div>
+      <div class="card__value card__value--metric" id="stat-reply-rate">—</div>
+      <div class="card__label">返信率<span class="card__sublabel">送信済のうち返信あり</span></div>
+    </div>
+    <div class="card card--metric">
+      <div class="card__icon" aria-hidden="true">✅</div>
+      <div class="card__value card__value--metric" id="stat-send-success-rate">—</div>
+      <div class="card__label">送信成功率<span class="card__sublabel">送信可否○のうち送信済</span></div>
+    </div>
+    <div class="card card--metric">
+      <div class="card__icon" aria-hidden="true">🏆</div>
+      <div class="card__value card__value--metric" id="stat-win-rate">—</div>
+      <div class="card__label">成約率<span class="card__sublabel">成約+失注のうち成約</span></div>
+    </div>
+  </div>
+
+  <div class="dashboard__actions">
+    <a class="button" href="#" data-page="search">企業を検索する</a>
+    <button class="button" disabled title="Sprint4で実装予定">メールを送信する</button>
+  </div>
+
+  <div class="dashboard__followups">
+    <h2>本日フォローすべき企業</h2>
+    <p id="followup-loading" class="empty-state">読み込み中…</p>
+    <p id="followup-error" class="error-message" hidden></p>
+    <p id="followup-empty" class="empty-state" hidden>本日フォローすべき企業はありません。</p>
+    <table class="company-table" id="followup-table" hidden>
+      <thead>
+        <tr>
+          <th>会社名</th>
+          <th>担当者名</th>
+          <th>ステータス</th>
+          <th>対象理由</th>
+        </tr>
+      </thead>
+      <tbody id="followup-table-body"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  (function () {
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    // 割合系KPI（返信率・送信成功率・成約率）は算出不能（分母0）の場合nullが返る。
+    // その場合は件数カードと同じ「—」表示にする（Sprint6②）。
+    function formatRate(rate) {
+      return rate != null ? rate + '%' : '—';
+    }
+
+    google.script.run
+      .withSuccessHandler(function (stats) {
+        stats = stats || {};
+        document.getElementById('stat-replied').textContent = stats.repliedCount != null ? stats.repliedCount : '—';
+        document.getElementById('stat-pending-send').textContent = stats.pendingSendCount != null ? stats.pendingSendCount : '—';
+        document.getElementById('stat-in-negotiation').textContent = stats.inNegotiationCount != null ? stats.inNegotiationCount : '—';
+        document.getElementById('stat-today-action').textContent = stats.todayActionCount != null ? stats.todayActionCount : '—';
+        document.getElementById('stat-won').textContent = stats.wonCount != null ? stats.wonCount : '—';
+        document.getElementById('stat-reply-rate').textContent = formatRate(stats.replyRate);
+        document.getElementById('stat-send-success-rate').textContent = formatRate(stats.sendSuccessRate);
+        document.getElementById('stat-win-rate').textContent = formatRate(stats.winRate);
+      })
+      .withFailureHandler(function (error) {
+        console.error(error);
+        showToast('集計値の取得に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+      })
+      .getDashboardStats();
+
+    var followupLoading = document.getElementById('followup-loading');
+    var followupError = document.getElementById('followup-error');
+    var followupEmpty = document.getElementById('followup-empty');
+    var followupTable = document.getElementById('followup-table');
+    var followupTableBody = document.getElementById('followup-table-body');
+
+    google.script.run
+      .withSuccessHandler(function (followUps) {
+        followupLoading.hidden = true;
+        followUps = followUps || [];
+
+        if (followUps.length === 0) {
+          followupEmpty.hidden = false;
+          return;
+        }
+
+        followupTableBody.innerHTML = followUps
+          .map(function (f) {
+            return (
+              '<tr>' +
+              '<td><a href="#" class="followup-company-link" data-company-name="' + escapeHtml(f.companyName) + '">' + escapeHtml(f.companyName) + '</a></td>' +
+              '<td>' + escapeHtml(f.ownerName) + '</td>' +
+              '<td>' + escapeHtml(f.status) + '</td>' +
+              '<td>' + escapeHtml(f.reason) + '</td>' +
+              '</tr>'
+            );
+          })
+          .join('');
+        followupTable.hidden = false;
+      })
+      .withFailureHandler(function (error) {
+        followupLoading.hidden = true;
+        followupError.hidden = false;
+        followupError.textContent = error && error.message ? error.message : String(error);
+      })
+      .listTodayFollowUps();
+
+    // フォロー対象の会社名をクリックすると、営業リスト画面へその会社名で絞り込んだ状態
+    // （?page=companyList&keyword=会社名）で遷移する（読み取り専用。既存のnavigateToPage()は
+    // 追加パラメータを扱えないため、ここではAPP_BASE_URL（Views/Index.html定義）を直接使う）。
+    followupTableBody.addEventListener('click', function (event) {
+      var link = event.target.closest('.followup-company-link');
+      if (!link) {
+        return;
+      }
+      event.preventDefault();
+      var companyName = link.getAttribute('data-company-name');
+      window.open(APP_BASE_URL + '?page=companyList&keyword=' + encodeURIComponent(companyName), '_top');
+    });
+
+    // 集計カードをクリックすると、営業リスト画面へ対応するstatusQuickFilterを適用した状態
+    // （?page=companyList&statusQuickFilter=xxx）で遷移する（Sprint6 Step14）。上記の
+    // フォロー対象リンクと同じ導線（APP_BASE_URLを使ったwindow.open）をそのまま再利用する。
+    function goToCompanyListWithQuickFilter(card) {
+      var statusQuickFilter = card.getAttribute('data-status-quick-filter');
+      window.open(APP_BASE_URL + '?page=companyList&statusQuickFilter=' + encodeURIComponent(statusQuickFilter), '_top');
+    }
+
+    document.getElementById('dashboard-cards').addEventListener('click', function (event) {
+      var card = event.target.closest('[data-status-quick-filter]');
+      if (!card) {
+        return;
+      }
+      goToCompanyListWithQuickFilter(card);
+    });
+
+    // role="button"のカードはEnter/Spaceキーでも操作できるようにする（Sprint6 UI仕上げ）。
+    document.getElementById('dashboard-cards').addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') {
+        return;
+      }
+      var card = event.target.closest('[data-status-quick-filter]');
+      if (!card) {
+        return;
+      }
+      event.preventDefault();
+      goToCompanyListWithQuickFilter(card);
+    });
+  })();
+</script>

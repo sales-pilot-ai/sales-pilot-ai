@@ -1,0 +1,1164 @@
+<section class="company-list" id="company-list-root">
+  <div class="company-list__status-undo-bar" id="status-undo-bar" hidden>
+    <span>ステータスを更新しました。</span>
+    <button type="button" class="button button--secondary" id="status-undo-button">元に戻す</button>
+  </div>
+
+  <form id="filter-form" class="company-list__filters">
+    <input type="text" id="filter-keyword" placeholder="会社名・住所で検索" />
+    <select id="filter-industry">
+      <option value="">業種（すべて）</option>
+    </select>
+    <select id="filter-send-status">
+      <option value="">送信状況（すべて）</option>
+      <option value="未送信">未送信</option>
+      <option value="送信済">送信済</option>
+      <option value="送信失敗">送信失敗</option>
+      <option value="返信あり">返信あり</option>
+      <option value="配信停止">配信停止</option>
+    </select>
+    <select id="filter-send-approval">
+      <option value="">送信可否（すべて）</option>
+      <option value="○">○</option>
+      <option value="×">×</option>
+    </select>
+    <button type="submit" class="button">絞り込む</button>
+    <a class="button button--secondary" href="#" data-page="search">企業検索へ</a>
+    <button type="button" class="button button--secondary" id="bulk-send-button">一括送信</button>
+    <button type="button" class="button button--secondary" id="reply-sync-button">返信確認</button>
+  </form>
+
+  <div class="company-list__status-filter" id="status-filter">
+    <button type="button" class="button button--secondary is-active" data-status-filter="all">すべて</button>
+    <button type="button" class="button button--secondary" data-status-filter="pendingSend">送信待ち</button>
+    <button type="button" class="button button--secondary" data-status-filter="replied">返信あり</button>
+    <button type="button" class="button button--secondary" data-status-filter="inNegotiation">商談中</button>
+    <button type="button" class="button button--secondary" data-status-filter="todayMeeting">本日商談</button>
+    <button type="button" class="button button--secondary" data-status-filter="won">成約</button>
+  </div>
+
+  <div class="company-list__selection">
+    <span id="selection-count">選択中：0件</span>
+    <div id="bulk-analyze-progress" class="company-list__bulk-progress" hidden>
+      <span id="bulk-progress-label" class="company-list__bulk-progress-label"></span>
+      <div class="progress-bar" id="bulk-progress-bar" role="progressbar" aria-label="処理の進捗" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar__fill" id="bulk-progress-fill"></div>
+      </div>
+    </div>
+    <div class="company-list__bulk-actions" id="bulk-action-bar" hidden>
+      <button type="button" class="button button--secondary" data-bulk-action="analyze">AI分析</button>
+      <button type="button" class="button button--secondary" data-bulk-action="send">送信</button>
+      <button type="button" class="button button--secondary" data-bulk-action="status">ステータス変更</button>
+    </div>
+  </div>
+
+  <p id="list-loading" class="empty-state">読み込み中…</p>
+  <p id="list-error" class="error-message" hidden></p>
+  <p id="list-empty" class="empty-state" hidden>該当する企業がありません。</p>
+
+  <table class="company-table" id="company-table" hidden>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="select-all-checkbox" aria-label="全選択" /></th>
+        <th>会社名</th>
+        <th>業種</th>
+        <th>エリア</th>
+        <th>送信状況</th>
+        <th>返信有無</th>
+        <th>商談日</th>
+        <th>成約</th>
+        <th>最終更新</th>
+        <th>詳細</th>
+        <th>AI要約</th>
+        <th>AI操作</th>
+      </tr>
+    </thead>
+    <tbody id="company-table-body"></tbody>
+  </table>
+
+  <div class="company-list__pagination" id="pagination" hidden></div>
+
+  <div class="modal-overlay" id="draft-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="draft-modal-close" aria-label="閉じる">×</button>
+      <h2>営業メール・DM下書き</h2>
+      <p id="draft-modal-error" class="error-message" hidden></p>
+      <div id="draft-modal-body-wrapper" hidden>
+        <label>件名</label>
+        <input type="text" id="draft-modal-subject" readonly />
+        <label>本文</label>
+        <textarea id="draft-modal-content" rows="10" readonly></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="history-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="history-modal-close" aria-label="閉じる">×</button>
+      <h2>メール履歴</h2>
+      <p id="history-modal-error" class="error-message" hidden></p>
+      <p id="history-modal-empty" class="empty-state" hidden>メール履歴がありません。</p>
+      <div id="history-modal-list"></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="status-change-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="status-change-modal-close" aria-label="閉じる">×</button>
+      <h2>ステータス変更</h2>
+      <label>変更先ステータス</label>
+      <select id="status-change-select">
+        <option value="未送信">送信待ち</option>
+        <option value="送信済">送信済</option>
+        <option value="返信あり">返信あり</option>
+        <option value="配信停止">配信停止</option>
+      </select>
+      <div class="company-list__bulk-actions">
+        <button type="button" class="button button--secondary" id="status-change-cancel-button">キャンセル</button>
+        <button type="button" class="button" id="status-change-update-button">更新</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var PAGE_SIZE = 20;
+    var allCompanies = [];
+    var currentPage = 1;
+    var statusQuickFilter = 'all';
+    var selectedCompanyIds = {};
+    // 検索フォーム（キーワード・業種・送信状況・送信可否）の現在の検索条件を保持する。
+    // loadCompanies()呼び出し側はここを更新してから渡すことで、一覧の再読み込み時にも
+    // 検索条件を維持できる（Sprint6 Step9）。
+    var currentFilter = {
+      keyword: '',
+      industry: '',
+      sendStatus: '',
+      sendApproval: '',
+    };
+    // 一括AI分析の実行中かどうか。実行中はhandleAnalyzeClick()完了時にボタンを再有効化
+    // しないようにするためのフラグ（Sprint6 Step10）。
+    var isBulkAnalyzing = false;
+    // 一括送信の実行中かどうか。実行中はhandleSendMailClick()完了時にボタンを再有効化
+    // しないようにするためのフラグ（Sprint6 Step11）。
+    var isBulkSending = false;
+    // 一括ステータス変更の実行中かどうか（Sprint6 Step12）。
+    var isBulkUpdatingStatus = false;
+    // 直近の一括ステータス変更の取り消し（Undo）情報。5秒以内であれば変更前の状態へ戻せる
+    // （永続保存はせずメモリ上のみで保持。Sprint6 Step13）。
+    // 形: { companyIds: [...], previousStatuses: { companyId: 変更前ステータス }, timeoutId }
+    var lastStatusChange = null;
+
+    var loadingEl = document.getElementById('list-loading');
+    var errorEl = document.getElementById('list-error');
+    var emptyEl = document.getElementById('list-empty');
+    var tableEl = document.getElementById('company-table');
+    var tbody = document.getElementById('company-table-body');
+    var paginationEl = document.getElementById('pagination');
+    var selectAllCheckbox = document.getElementById('select-all-checkbox');
+    var selectionCountEl = document.getElementById('selection-count');
+    var bulkActionBarEl = document.getElementById('bulk-action-bar');
+    var bulkAnalyzeProgressEl = document.getElementById('bulk-analyze-progress');
+    var bulkProgressLabelEl = document.getElementById('bulk-progress-label');
+    var bulkProgressFillEl = document.getElementById('bulk-progress-fill');
+    var bulkProgressBarEl = document.getElementById('bulk-progress-bar');
+    var companyListRootEl = document.getElementById('company-list-root');
+    var statusUndoBarEl = document.getElementById('status-undo-bar');
+
+    var draftModal = document.getElementById('draft-modal');
+    var draftModalError = document.getElementById('draft-modal-error');
+    var draftModalBodyWrapper = document.getElementById('draft-modal-body-wrapper');
+    var draftModalSubject = document.getElementById('draft-modal-subject');
+    var draftModalContent = document.getElementById('draft-modal-content');
+
+    var historyModal = document.getElementById('history-modal');
+    var historyModalError = document.getElementById('history-modal-error');
+    var historyModalEmpty = document.getElementById('history-modal-empty');
+    var historyModalList = document.getElementById('history-modal-list');
+
+    var statusChangeModal = document.getElementById('status-change-modal');
+    var statusChangeSelect = document.getElementById('status-change-select');
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function populateIndustryOptions(companies) {
+      var select = document.getElementById('filter-industry');
+      var existing = Array.prototype.map.call(select.options, function (o) {
+        return o.value;
+      });
+      var industries = [];
+      companies.forEach(function (c) {
+        if (c.industry && industries.indexOf(c.industry) === -1) {
+          industries.push(c.industry);
+        }
+      });
+      industries.forEach(function (industry) {
+        if (existing.indexOf(industry) === -1) {
+          var option = document.createElement('option');
+          option.value = industry;
+          option.textContent = industry;
+          select.appendChild(option);
+        }
+      });
+    }
+
+    function findCompany(companyId) {
+      return allCompanies.filter(function (c) {
+        return c.companyId === companyId;
+      })[0];
+    }
+
+    function getTodayDateString() {
+      var d = new Date();
+      var mm = String(d.getMonth() + 1).padStart(2, '0');
+      var dd = String(d.getDate()).padStart(2, '0');
+      return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    // 既存のキーワード・業種・送信状況・送信可否の絞り込み結果（allCompanies）に対して、
+    // クライアント側でさらにステータスの簡易フィルタを重ねる（読み取り専用・サーバー側の
+    // listCompaniesFromSheet_は変更しない）。
+    function applyStatusQuickFilter(companies) {
+      if (statusQuickFilter === 'all') {
+        return companies;
+      }
+
+      var today = getTodayDateString();
+
+      return companies.filter(function (c) {
+        switch (statusQuickFilter) {
+          case 'pendingSend':
+            return c.sendApproval === '○' && c.sendStatus !== '送信済';
+          case 'replied':
+            return c.hasReply === '返信あり';
+          case 'inNegotiation':
+            return !!c.meetingDate && !c.dealResult;
+          case 'todayMeeting':
+            return !!c.meetingDate && String(c.meetingDate).indexOf(today) === 0;
+          case 'won':
+            return c.dealResult === '成約';
+          default:
+            return true;
+        }
+      });
+    }
+
+    // 選択件数表示・一括操作バーの表示/非表示を選択状態に合わせて更新する（画面表示のみ、
+    // 会社データは変更しない）。
+    function updateSelectionUI() {
+      var count = Object.keys(selectedCompanyIds).length;
+      selectionCountEl.textContent = '選択中：' + count + '件';
+      bulkActionBarEl.hidden = count === 0;
+    }
+
+    // 表示中ページの行チェックボックスがすべて選択済みかどうかをヘッダーの全選択
+    // チェックボックスへ反映する。
+    function updateSelectAllCheckboxState() {
+      var checkboxes = tbody.querySelectorAll('.row-select-checkbox');
+      selectAllCheckbox.checked =
+        checkboxes.length > 0 && Array.prototype.every.call(checkboxes, function (cb) {
+          return cb.checked;
+        });
+    }
+
+    function renderPage() {
+      // ページ・絞り込みが変わるたびに選択状態はリセットする（表示中ページのみを選択対象と
+      // するため）。
+      selectedCompanyIds = {};
+      selectAllCheckbox.checked = false;
+      updateSelectionUI();
+
+      var filteredCompanies = applyStatusQuickFilter(allCompanies);
+
+      if (filteredCompanies.length === 0) {
+        tableEl.hidden = true;
+        paginationEl.hidden = true;
+        emptyEl.hidden = false;
+        return;
+      }
+      emptyEl.hidden = true;
+      tableEl.hidden = false;
+
+      var totalPages = Math.max(1, Math.ceil(filteredCompanies.length / PAGE_SIZE));
+      currentPage = Math.min(currentPage, totalPages);
+      var start = (currentPage - 1) * PAGE_SIZE;
+      var pageItems = filteredCompanies.slice(start, start + PAGE_SIZE);
+
+      tbody.innerHTML = pageItems
+        .map(function (c) {
+          return (
+            '<tr data-company-id="' + escapeHtml(c.companyId) + '">' +
+            '<td><input type="checkbox" class="row-select-checkbox" data-company-id="' + escapeHtml(c.companyId) + '" aria-label="選択" /></td>' +
+            '<td>' + escapeHtml(c.companyName) + '</td>' +
+            '<td>' + escapeHtml(c.industry) + '</td>' +
+            '<td>' + escapeHtml(c.area) + '</td>' +
+            '<td>' + escapeHtml(c.sendStatus) + '</td>' +
+            '<td>' + escapeHtml(c.hasReply) + '</td>' +
+            '<td>' + escapeHtml(c.meetingDate) + '</td>' +
+            '<td>' + escapeHtml(c.dealResult) + '</td>' +
+            '<td>' + escapeHtml(c.updatedAt) + '</td>' +
+            '<td title="企業詳細はSprint3で実装予定">-</td>' +
+            '<td class="ai-summary-cell" title="' + escapeHtml(c.aiSummary) + '">' + escapeHtml(c.aiSummary || '未解析') + '</td>' +
+            '<td class="company-table__ai-actions">' +
+            '<button type="button" class="button button--secondary" data-action="analyze">AI分析</button>' +
+            '<button type="button" class="button button--secondary" data-action="history">履歴</button>' +
+            '<button type="button" class="button button--secondary" data-action="draft">営業メール生成</button>' +
+            '<button type="button" class="button button--secondary" data-action="gmail-draft">Gmail下書き作成</button>' +
+            '<button type="button" class="button button--secondary" data-action="send-mail">送信</button>' +
+            '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+
+      paginationEl.hidden = totalPages <= 1;
+      paginationEl.innerHTML = '';
+      for (var i = 1; i <= totalPages; i++) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'button button--secondary' + (i === currentPage ? ' is-active' : '');
+        button.textContent = String(i);
+        (function (page) {
+          button.addEventListener('click', function () {
+            currentPage = page;
+            renderPage();
+          });
+        })(i);
+        paginationEl.appendChild(button);
+      }
+    }
+
+    function loadCompanies(filter) {
+      loadingEl.hidden = false;
+      errorEl.hidden = true;
+      emptyEl.hidden = true;
+      tableEl.hidden = true;
+      paginationEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (companies) {
+          loadingEl.hidden = true;
+          allCompanies = companies || [];
+          currentPage = 1;
+          populateIndustryOptions(allCompanies);
+          if (allCompanies.length === 0) {
+            emptyEl.hidden = false;
+            return;
+          }
+          tableEl.hidden = false;
+          renderPage();
+        })
+        .withFailureHandler(function (error) {
+          loadingEl.hidden = true;
+          errorEl.hidden = false;
+          errorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .listCompanies(filter || {});
+    }
+
+    selectAllCheckbox.addEventListener('change', function () {
+      var checkboxes = tbody.querySelectorAll('.row-select-checkbox');
+      var checked = selectAllCheckbox.checked;
+
+      Array.prototype.forEach.call(checkboxes, function (cb) {
+        cb.checked = checked;
+        var companyId = cb.getAttribute('data-company-id');
+        if (checked) {
+          selectedCompanyIds[companyId] = true;
+        } else {
+          delete selectedCompanyIds[companyId];
+        }
+      });
+
+      updateSelectionUI();
+    });
+
+    tbody.addEventListener('change', function (event) {
+      var checkbox = event.target.closest('.row-select-checkbox');
+      if (!checkbox) {
+        return;
+      }
+
+      var companyId = checkbox.getAttribute('data-company-id');
+      if (checkbox.checked) {
+        selectedCompanyIds[companyId] = true;
+      } else {
+        delete selectedCompanyIds[companyId];
+      }
+
+      updateSelectAllCheckboxState();
+      updateSelectionUI();
+    });
+
+    bulkActionBarEl.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-bulk-action]');
+      if (!button) {
+        return;
+      }
+
+      var action = button.getAttribute('data-bulk-action');
+      if (action === 'analyze') {
+        handleBulkAnalyzeClick();
+        return;
+      }
+      if (action === 'send') {
+        handleBulkSendClick();
+        return;
+      }
+      if (action === 'status') {
+        openStatusChangeModal();
+        return;
+      }
+
+      showToast('Sprint7以降で実装予定', 'info');
+    });
+
+    // statusQuickFilterを切り替え、ステータスフィルタボタンのis-active表示も合わせて更新する
+    // （クリック操作・URLパラメータからの初期表示の両方から共通で呼び出す。Sprint6 Step14）。
+    function applyStatusQuickFilterSelection(key) {
+      statusQuickFilter = key;
+      Array.prototype.forEach.call(document.querySelectorAll('#status-filter [data-status-filter]'), function (b) {
+        b.classList.toggle('is-active', b.getAttribute('data-status-filter') === key);
+      });
+    }
+
+    document.getElementById('status-filter').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-status-filter]');
+      if (!button) {
+        return;
+      }
+
+      currentPage = 1;
+      applyStatusQuickFilterSelection(button.getAttribute('data-status-filter'));
+
+      if (allCompanies.length > 0) {
+        renderPage();
+      }
+    });
+
+    document.getElementById('filter-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      currentFilter = {
+        keyword: document.getElementById('filter-keyword').value,
+        industry: document.getElementById('filter-industry').value,
+        sendStatus: document.getElementById('filter-send-status').value,
+        sendApproval: document.getElementById('filter-send-approval').value,
+      };
+      loadCompanies(currentFilter);
+    });
+
+    document.getElementById('bulk-send-button').addEventListener('click', function () {
+      var eligibleCount = allCompanies.filter(function (c) {
+        return c.sendApproval === '○' && c.sendStatus !== '送信済';
+      }).length;
+
+      if (eligibleCount === 0) {
+        showToast('送信対象の企業がありません。', 'info');
+        return;
+      }
+
+      var confirmed = window.confirm(
+        '━━━━━━━━━━━━━━━━━━\n' +
+        eligibleCount + '件の営業メールを送信します。\n\n' +
+        '送信後は取り消せません。\n\n' +
+        '送信しますか？\n' +
+        '━━━━━━━━━━━━━━━━━━'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      var bulkSendButton = document.getElementById('bulk-send-button');
+      var originalText = bulkSendButton.textContent;
+      bulkSendButton.disabled = true;
+      bulkSendButton.classList.add('button--loading');
+      bulkSendButton.textContent = '送信中…';
+      var toast = showToast('送信中…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          bulkSendButton.disabled = false;
+          bulkSendButton.classList.remove('button--loading');
+          bulkSendButton.textContent = originalText;
+
+          var message = '送信完了\n\n成功 ' + result.successCount + '件\n失敗 ' + result.failureCount + '件';
+          if (result.failedCompanies && result.failedCompanies.length > 0) {
+            message +=
+              '\n\n失敗企業:\n' +
+              result.failedCompanies
+                .map(function (f) {
+                  return '・' + f.companyName;
+                })
+                .join('\n');
+          }
+          toast.update(message, result.failureCount > 0 ? 'error' : 'success');
+          loadCompanies({});
+        })
+        .withFailureHandler(function (error) {
+          bulkSendButton.disabled = false;
+          bulkSendButton.classList.remove('button--loading');
+          bulkSendButton.textContent = originalText;
+          toast.update('一括送信に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .sendSalesMailBatch();
+    });
+
+    document.getElementById('reply-sync-button').addEventListener('click', function () {
+      var confirmed = window.confirm(
+        '━━━━━━━━━━━━━━\n' +
+        '返信有無を更新します。\n\n' +
+        '実行しますか？\n' +
+        '━━━━━━━━━━━━━━'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      var replySyncButton = document.getElementById('reply-sync-button');
+      var originalText = replySyncButton.textContent;
+      replySyncButton.disabled = true;
+      replySyncButton.classList.add('button--loading');
+      replySyncButton.textContent = '確認中…';
+      var toast = showToast('返信を確認しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          replySyncButton.disabled = false;
+          replySyncButton.classList.remove('button--loading');
+          replySyncButton.textContent = originalText;
+          toast.update('更新 ' + result.updatedCount + '件', 'success');
+          loadCompanies({});
+        })
+        .withFailureHandler(function (error) {
+          replySyncButton.disabled = false;
+          replySyncButton.classList.remove('button--loading');
+          replySyncButton.textContent = originalText;
+          toast.update('返信確認に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .syncReplyStatus();
+    });
+
+    // 単体AI分析（AI分析ボタン押下時の処理）。onDoneを渡した場合は失敗時のalertを出さず、
+    // 呼び出し元に成否を通知する（Sprint6 Step8の一括AI分析から同じ処理を再利用するため）。
+    function handleAnalyzeClick(button, companyId, onDone) {
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '解析中…';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          // 一括AI分析の実行中は、完了までボタンを再有効化しない（Sprint6 Step10）。
+          if (!isBulkAnalyzing) {
+            button.disabled = false;
+          }
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          var company = findCompany(companyId);
+          if (company) {
+            company.aiSummary = result.summary || '';
+          }
+
+          var row = tbody.querySelector('tr[data-company-id="' + companyId + '"]');
+          if (row) {
+            var summaryCell = row.querySelector('.ai-summary-cell');
+            if (summaryCell) {
+              if (result.status === '成功') {
+                summaryCell.textContent = result.summary || '未解析';
+                summaryCell.title = result.summary || '';
+              } else {
+                summaryCell.textContent = '解析失敗: ' + (result.errorMessage || '不明なエラー');
+                summaryCell.title = result.errorMessage || '';
+              }
+            }
+          }
+
+          if (onDone) {
+            onDone(result && result.status === '成功');
+          }
+        })
+        .withFailureHandler(function (error) {
+          if (!isBulkAnalyzing) {
+            button.disabled = false;
+          }
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          if (onDone) {
+            onDone(false);
+          } else {
+            showToast('AI分析に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          }
+        })
+        .analyzeCompanyInfo(companyId);
+    }
+
+    // 一括AI分析（Sprint6 Step8）。Step7で選択された企業のみを対象に、既存の単体AI分析処理
+    // （handleAnalyzeClick）を1件ずつ順番に呼び出す。AI分析ロジック自体は変更しない。
+    //
+    // 一括AI分析中は画面全体をロックする（Sprint6 Step10）。button要素はdisabledで、
+    // チェックボックス・検索フォームの入力欄もdisabledで操作不可にし、さらにセクション全体へ
+    // pointer-events:noneを付与することで、disabledが効かない要素（<a>リンク等）を含めて
+    // クリック等の操作を一切受け付けないようにする。
+    function setPageBusy(disabled) {
+      Array.prototype.forEach.call(document.querySelectorAll('button'), function (btn) {
+        btn.disabled = disabled;
+      });
+
+      document.getElementById('filter-keyword').disabled = disabled;
+      document.getElementById('filter-industry').disabled = disabled;
+      document.getElementById('filter-send-status').disabled = disabled;
+      document.getElementById('filter-send-approval').disabled = disabled;
+
+      selectAllCheckbox.disabled = disabled;
+      Array.prototype.forEach.call(tbody.querySelectorAll('.row-select-checkbox'), function (cb) {
+        cb.disabled = disabled;
+      });
+
+      companyListRootEl.classList.toggle('is-locked', disabled);
+    }
+
+    // 一括処理（AI分析・送信・ステータス変更共通）の進捗表示。labelには「AI分析中」「送信中」等を
+    // 渡す（Sprint6 Step8で新設、Step11で送信と共用化。Sprint6④でテキストのみの表示から
+    // プログレスバーへ変更）。
+    function showBulkProgress(label, current, total) {
+      bulkAnalyzeProgressEl.hidden = false;
+      bulkProgressLabelEl.textContent = label + '... ' + current + ' / ' + total;
+      var percent = total > 0 ? Math.round((current / total) * 100) : 0;
+      bulkProgressFillEl.style.width = percent + '%';
+      bulkProgressBarEl.setAttribute('aria-valuenow', String(percent));
+    }
+
+    function hideBulkProgress() {
+      bulkAnalyzeProgressEl.hidden = true;
+      bulkProgressLabelEl.textContent = '';
+      bulkProgressFillEl.style.width = '0%';
+      bulkProgressBarEl.removeAttribute('aria-valuenow');
+    }
+
+    // 一括処理（AI分析・送信共通）の実行ランナー。選択された企業を1件ずつ、options.handler
+    // （handleAnalyzeClick または handleSendMailClick）で順番に処理し、成功/失敗件数を集計する。
+    // 1件失敗しても中断せず最後まで続行する（Sprint6 Step8で新設、Step11で送信と共用化）。
+    function runBulkStep(companyIds, index, successCount, failureCount, onComplete, options) {
+      if (index >= companyIds.length) {
+        onComplete(successCount, failureCount);
+        return;
+      }
+
+      showBulkProgress(options.progressLabel, index + 1, companyIds.length);
+
+      var companyId = companyIds[index];
+      var row = tbody.querySelector('tr[data-company-id="' + companyId + '"]');
+      var button = row ? row.querySelector(options.buttonSelector) : null;
+
+      if (!button) {
+        runBulkStep(companyIds, index + 1, successCount, failureCount + 1, onComplete, options);
+        return;
+      }
+
+      options.handler(button, companyId, function (success) {
+        // isBulkAnalyzing/isBulkSending中はhandleAnalyzeClick()/handleSendMailClick()が
+        // ボタンを再有効化しないため、ここで再度disabledにする処理は不要（Sprint6 Step10）。
+        if (success) {
+          runBulkStep(companyIds, index + 1, successCount + 1, failureCount, onComplete, options);
+        } else {
+          runBulkStep(companyIds, index + 1, successCount, failureCount + 1, onComplete, options);
+        }
+      });
+    }
+
+    function handleBulkAnalyzeClick() {
+      var companyIds = Object.keys(selectedCompanyIds);
+      if (companyIds.length === 0) {
+        return;
+      }
+
+      var confirmed = window.confirm(companyIds.length + '件の企業をAI分析します。\nよろしいですか？');
+      if (!confirmed) {
+        return;
+      }
+
+      isBulkAnalyzing = true;
+      setPageBusy(true);
+
+      runBulkStep(
+        companyIds,
+        0,
+        0,
+        0,
+        function (successCount, failureCount) {
+          isBulkAnalyzing = false;
+          hideBulkProgress();
+          setPageBusy(false);
+          showToast('AI分析が完了しました。\n\n成功 ' + successCount + '件\n失敗 ' + failureCount + '件', failureCount > 0 ? 'error' : 'success');
+          // 検索条件（keyword/industry/sendStatus/sendApproval）を維持したまま再読み込みする
+          // （statusQuickFilterはrenderPage()が毎回参照するため、ここで渡す必要はない。Sprint6 Step9）。
+          loadCompanies(currentFilter);
+        },
+        { progressLabel: 'AI分析中', buttonSelector: '[data-action="analyze"]', handler: handleAnalyzeClick }
+      );
+    }
+
+    // 一括送信（Sprint6 Step11）。Step7で選択された企業のみを対象に、既存の単体送信処理
+    // （handleSendMailClick）を1件ずつ順番に呼び出す。送信ロジック自体は変更しない。
+    function handleBulkSendClick() {
+      var companyIds = Object.keys(selectedCompanyIds);
+      if (companyIds.length === 0) {
+        return;
+      }
+
+      var confirmed = window.confirm(companyIds.length + '件の企業へ送信します。\nよろしいですか？');
+      if (!confirmed) {
+        return;
+      }
+
+      isBulkSending = true;
+      setPageBusy(true);
+
+      runBulkStep(
+        companyIds,
+        0,
+        0,
+        0,
+        function (successCount, failureCount) {
+          isBulkSending = false;
+          hideBulkProgress();
+          setPageBusy(false);
+          showToast('送信完了\n\n成功 ' + successCount + '件\n失敗 ' + failureCount + '件', failureCount > 0 ? 'error' : 'success');
+          // 検索条件・statusQuickFilterを維持したまま再読み込みする（Sprint6 Step9と同様）。
+          loadCompanies(currentFilter);
+        },
+        { progressLabel: '送信中', buttonSelector: '[data-action="send-mail"]', handler: handleSendMailClick }
+      );
+    }
+
+    function openStatusChangeModal() {
+      statusChangeModal.hidden = false;
+    }
+
+    function closeStatusChangeModal() {
+      statusChangeModal.hidden = true;
+    }
+
+    // 単体ステータス変更（Sprint6 Step12）。営業リストの「送信状況」をstatusへ更新する。
+    // markCompanySent_/markCompanyReplied_（固定値・非公開）とは別に、値を指定できる
+    // updateCompanyStatus_をRouter経由で呼び出す最小限の単体更新処理。
+    function handleUpdateStatusClick(button, companyId, status, onDone) {
+      button.classList.add('button--loading');
+      google.script.run
+        .withSuccessHandler(function () {
+          button.classList.remove('button--loading');
+          onDone(true);
+        })
+        .withFailureHandler(function () {
+          button.classList.remove('button--loading');
+          onDone(false);
+        })
+        .updateCompanyStatus(companyId, status);
+    }
+
+    // 一括ステータス変更（Sprint6 Step12）。Step7で選択された企業のみを対象に、上記の
+    // 単体ステータス変更処理を、既存のrunBulkStep()で1件ずつ順番に呼び出す（ランナー・
+    // 進捗表示・画面ロックはStep8/11と共通のものをそのまま再利用し、新設しない）。
+    //
+    // 実行前に対象企業の変更前ステータスをメモリ上へ保持し、完了後は成功/失敗のalertの
+    // 代わりに「元に戻す」通知バーを5秒間表示する（Sprint6 Step13）。
+    function handleBulkStatusUpdateClick(status) {
+      var companyIds = Object.keys(selectedCompanyIds);
+      if (companyIds.length === 0) {
+        return;
+      }
+
+      var previousStatuses = {};
+      companyIds.forEach(function (companyId) {
+        var company = findCompany(companyId);
+        previousStatuses[companyId] = company ? company.sendStatus : '';
+      });
+
+      isBulkUpdatingStatus = true;
+      setPageBusy(true);
+
+      runBulkStep(
+        companyIds,
+        0,
+        0,
+        0,
+        function () {
+          isBulkUpdatingStatus = false;
+          hideBulkProgress();
+          setPageBusy(false);
+          showStatusUndoBar(companyIds, previousStatuses);
+          // 検索条件・statusQuickFilterを維持したまま再読み込みする（Sprint6 Step9と同様）。
+          loadCompanies(currentFilter);
+        },
+        {
+          progressLabel: '更新中',
+          buttonSelector: '[data-action="analyze"]',
+          handler: function (button, companyId, onDone) {
+            handleUpdateStatusClick(button, companyId, status, onDone);
+          },
+        }
+      );
+    }
+
+    // 一括ステータス変更のUndo通知バーを5秒間表示する（Sprint6 Step13）。5秒経過したら
+    // Undo情報を破棄し、以後「元に戻す」を押しても何も起きなくなる。
+    function showStatusUndoBar(companyIds, previousStatuses) {
+      if (lastStatusChange && lastStatusChange.timeoutId) {
+        clearTimeout(lastStatusChange.timeoutId);
+      }
+
+      lastStatusChange = { companyIds: companyIds, previousStatuses: previousStatuses };
+      statusUndoBarEl.hidden = false;
+      lastStatusChange.timeoutId = setTimeout(function () {
+        hideStatusUndoBar();
+      }, 5000);
+    }
+
+    function hideStatusUndoBar() {
+      if (lastStatusChange && lastStatusChange.timeoutId) {
+        clearTimeout(lastStatusChange.timeoutId);
+      }
+      lastStatusChange = null;
+      statusUndoBarEl.hidden = true;
+    }
+
+    // Undo実行（Sprint6 Step13）。保持しておいた変更前ステータスへ、既存のhandleUpdateStatusClick
+    // （updateCompanyStatus()を呼ぶ単体ステータス変更処理）を、既存のrunBulkStep()で1件ずつ
+    // 順番に呼び戻す。新しいService・Router・ランナーは追加しない。
+    function handleStatusUndoClick() {
+      if (!lastStatusChange) {
+        return;
+      }
+
+      var change = lastStatusChange;
+      hideStatusUndoBar();
+
+      isBulkUpdatingStatus = true;
+      setPageBusy(true);
+
+      runBulkStep(
+        change.companyIds,
+        0,
+        0,
+        0,
+        function () {
+          isBulkUpdatingStatus = false;
+          hideBulkProgress();
+          setPageBusy(false);
+          loadCompanies(currentFilter);
+        },
+        {
+          progressLabel: '元に戻しています',
+          buttonSelector: '[data-action="analyze"]',
+          handler: function (button, companyId, onDone) {
+            handleUpdateStatusClick(button, companyId, change.previousStatuses[companyId], onDone);
+          },
+        }
+      );
+    }
+
+    function openDraftModal() {
+      draftModal.hidden = false;
+    }
+
+    function closeDraftModal() {
+      draftModal.hidden = true;
+    }
+
+    function openHistoryModal() {
+      historyModal.hidden = false;
+    }
+
+    function closeHistoryModal() {
+      historyModal.hidden = true;
+    }
+
+    function renderHistoryList(threads) {
+      historyModalList.innerHTML = threads
+        .map(function (thread) {
+          var messagesHtml = thread.messages
+            .map(function (message, index) {
+              return (
+                (index > 0 ? '<hr class="mail-history-message-divider" />' : '') +
+                '<p class="mail-history-direction"><strong>' + escapeHtml(message.direction) + '</strong></p>' +
+                '<p class="mail-history-date">' + escapeHtml(message.date) + '</p>' +
+                '<div class="mail-history-body">' + escapeHtml(message.body) + '</div>'
+              );
+            })
+            .join('');
+
+          return (
+            '<div class="mail-history-thread">' +
+            '<p class="mail-history-subject"><strong>件名:</strong> ' + escapeHtml(thread.subject) + '</p>' +
+            messagesHtml +
+            '</div>'
+          );
+        })
+        .join('');
+    }
+
+    function handleHistoryClick(button, companyId) {
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '取得中…';
+
+      historyModalError.hidden = true;
+      historyModalEmpty.hidden = true;
+      historyModalList.innerHTML = '';
+      openHistoryModal();
+
+      google.script.run
+        .withSuccessHandler(function (history) {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          history = history || [];
+          if (history.length === 0) {
+            historyModalEmpty.hidden = false;
+            return;
+          }
+          renderHistoryList(history);
+        })
+        .withFailureHandler(function (error) {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          historyModalError.textContent = error && error.message ? error.message : String(error);
+          historyModalError.hidden = false;
+        })
+        .listCompanyMailHistory(companyId);
+    }
+
+    function handleDraftClick(button, companyId) {
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '生成中…';
+
+      draftModalError.hidden = true;
+      draftModalBodyWrapper.hidden = true;
+      openDraftModal();
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          console.log('generateSalesDraft result:', result);
+          console.log('draftStatus:', result && result.draftStatus);
+          console.log('draftSubject:', result && result.draftSubject);
+          console.log('draftBody:', result && result.draftBody);
+
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          if (result.draftStatus !== '成功') {
+            draftModalError.textContent = result.draftErrorMessage || '営業メールの生成に失敗しました。';
+            draftModalError.hidden = false;
+            draftModalBodyWrapper.hidden = true;
+            return;
+          }
+
+          draftModalSubject.value = result.draftSubject || '';
+          draftModalContent.value = result.draftBody || '';
+          draftModalBodyWrapper.hidden = false;
+        })
+        .withFailureHandler(function (error) {
+          console.error('generateSalesDraft error:', error);
+
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          draftModalError.textContent = error && error.message ? error.message : String(error);
+          draftModalError.hidden = false;
+        })
+        .generateSalesDraft(companyId);
+    }
+
+    function handleGmailDraftClick(button, companyId) {
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '作成中…';
+      var toast = showToast('Gmail下書きを作成しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          toast.update('Gmailに下書きを作成しました。Gmailの下書きフォルダをご確認ください。', 'success');
+        })
+        .withFailureHandler(function (error) {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          toast.update('Gmail下書きの作成に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .createGmailDraft(companyId);
+    }
+
+    // 単体送信（送信ボタン押下時の処理）。onDoneを渡した場合は完了alertを出さず、
+    // 呼び出し元に成否を通知する（Sprint6 Step11の一括送信から同じ処理を再利用するため）。
+    function handleSendMailClick(button, companyId, onDone) {
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '送信中…';
+      // 一括送信（onDone経由）は完了時に一括分をまとめてトースト表示するため、ここでは
+      // 個別送信（onDoneなし）の場合のみ処理中トーストを出す。
+      var toast = onDone ? null : showToast('送信中…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          // 一括送信の実行中は、完了までボタンを再有効化しない（Sprint6 Step11）。
+          if (!isBulkSending) {
+            button.disabled = false;
+          }
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          if (onDone) {
+            onDone(true);
+          } else {
+            toast.update('営業メールを送信しました。', 'success');
+          }
+        })
+        .withFailureHandler(function (error) {
+          if (!isBulkSending) {
+            button.disabled = false;
+          }
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+
+          if (onDone) {
+            onDone(false);
+          } else {
+            toast.update('営業メールの送信に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          }
+        })
+        .sendSalesMail(companyId);
+    }
+
+    tbody.addEventListener('click', function (event) {
+      var row = event.target.closest('tr[data-company-id]');
+      if (!row) {
+        return;
+      }
+      var companyId = row.getAttribute('data-company-id');
+
+      var analyzeBtn = event.target.closest('[data-action="analyze"]');
+      if (analyzeBtn) {
+        handleAnalyzeClick(analyzeBtn, companyId);
+        return;
+      }
+
+      var historyBtn = event.target.closest('[data-action="history"]');
+      if (historyBtn) {
+        handleHistoryClick(historyBtn, companyId);
+        return;
+      }
+
+      var draftBtn = event.target.closest('[data-action="draft"]');
+      if (draftBtn) {
+        handleDraftClick(draftBtn, companyId);
+        return;
+      }
+
+      var gmailDraftBtn = event.target.closest('[data-action="gmail-draft"]');
+      if (gmailDraftBtn) {
+        handleGmailDraftClick(gmailDraftBtn, companyId);
+        return;
+      }
+
+      var sendMailBtn = event.target.closest('[data-action="send-mail"]');
+      if (sendMailBtn) {
+        var confirmed = window.confirm(
+          '━━━━━━━━━━━━━━━━━━\n' +
+          '営業メールを送信します。\n\n' +
+          '送信後は取り消せません。\n\n' +
+          '送信しますか？\n' +
+          '━━━━━━━━━━━━━━━━━━'
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        handleSendMailClick(sendMailBtn, companyId);
+      }
+    });
+
+    document.getElementById('draft-modal-close').addEventListener('click', closeDraftModal);
+    draftModal.addEventListener('click', function (event) {
+      if (event.target === draftModal) {
+        closeDraftModal();
+      }
+    });
+
+    document.getElementById('history-modal-close').addEventListener('click', closeHistoryModal);
+    historyModal.addEventListener('click', function (event) {
+      if (event.target === historyModal) {
+        closeHistoryModal();
+      }
+    });
+
+    document.getElementById('status-change-modal-close').addEventListener('click', closeStatusChangeModal);
+    document.getElementById('status-change-cancel-button').addEventListener('click', closeStatusChangeModal);
+    statusChangeModal.addEventListener('click', function (event) {
+      if (event.target === statusChangeModal) {
+        closeStatusChangeModal();
+      }
+    });
+    document.getElementById('status-change-update-button').addEventListener('click', function () {
+      var status = statusChangeSelect.value;
+      closeStatusChangeModal();
+      handleBulkStatusUpdateClick(status);
+    });
+
+    document.getElementById('status-undo-button').addEventListener('click', handleStatusUndoClick);
+
+    // ダッシュボードのフォローアップ一覧から遷移した場合（?page=companyList&keyword=会社名）、
+    // その会社名で絞り込んだ状態で表示する。keywordが無い場合は従来どおり全件表示する。
+    var initialKeyword = '';
+    try {
+      initialKeyword = new URLSearchParams(window.location.search).get('keyword') || '';
+    } catch (e) {
+      initialKeyword = '';
+    }
+    if (initialKeyword) {
+      document.getElementById('filter-keyword').value = initialKeyword;
+    }
+    currentFilter = {
+      keyword: initialKeyword,
+      industry: '',
+      sendStatus: '',
+      sendApproval: '',
+    };
+
+    // Dashboardの集計カードから遷移した場合（?page=companyList&statusQuickFilter=xxx）、
+    // 対応するステータスクイックフィルタを適用した状態で表示する。keywordパラメータとも
+    // 併用可能（両方指定されていれば両方適用される）。初期表示時に読み取るのみで、
+    // それ以外の挙動（検索・ページング・一括操作・currentFilter等）には影響しない
+    // （Sprint6 Step14）。
+    var initialStatusQuickFilter = '';
+    try {
+      initialStatusQuickFilter = new URLSearchParams(window.location.search).get('statusQuickFilter') || '';
+    } catch (e) {
+      initialStatusQuickFilter = '';
+    }
+    var VALID_STATUS_QUICK_FILTERS = ['all', 'pendingSend', 'replied', 'inNegotiation', 'todayMeeting', 'won'];
+    if (initialStatusQuickFilter && VALID_STATUS_QUICK_FILTERS.indexOf(initialStatusQuickFilter) !== -1) {
+      applyStatusQuickFilterSelection(initialStatusQuickFilter);
+    }
+
+    loadCompanies(currentFilter);
+  })();
+</script>

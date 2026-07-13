@@ -1,0 +1,237 @@
+<section class="inbox">
+  <p id="inbox-loading" class="empty-state">受信取得中…</p>
+  <p id="inbox-error" class="error-message" hidden></p>
+  <p id="inbox-empty" class="empty-state" hidden>受信メールがありません。</p>
+
+  <table class="company-table" id="inbox-table" hidden>
+    <thead>
+      <tr>
+        <th></th>
+        <th>送信者</th>
+        <th>件名</th>
+        <th>受信日時</th>
+        <th>スニペット</th>
+      </tr>
+    </thead>
+    <tbody id="inbox-table-body"></tbody>
+  </table>
+
+  <div id="message-detail"></div>
+</section>
+
+<script>
+  (function () {
+    var loadingEl = document.getElementById('inbox-loading');
+    var errorEl = document.getElementById('inbox-error');
+    var emptyEl = document.getElementById('inbox-empty');
+    var tableEl = document.getElementById('inbox-table');
+    var tbody = document.getElementById('inbox-table-body');
+    var detailEl = document.getElementById('message-detail');
+    var replyTemplates = [];
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function loadInbox() {
+      loadingEl.hidden = false;
+      errorEl.hidden = true;
+      emptyEl.hidden = true;
+      tableEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (messages) {
+          loadingEl.hidden = true;
+          messages = messages || [];
+          if (messages.length === 0) {
+            emptyEl.hidden = false;
+            return;
+          }
+
+          tableEl.hidden = false;
+          tbody.innerHTML = messages
+            .map(function (m) {
+              return (
+                '<tr data-thread-id="' + escapeHtml(m.threadId) + '" style="cursor: pointer;">' +
+                '<td>' + (m.unread ? '●' : '') + '</td>' +
+                '<td>' + escapeHtml(m.from) + '</td>' +
+                '<td>' + escapeHtml(m.subject) + '</td>' +
+                '<td>' + escapeHtml(m.date) + '</td>' +
+                '<td>' + escapeHtml(m.snippet) + '</td>' +
+                '</tr>'
+              );
+            })
+            .join('');
+        })
+        .withFailureHandler(function (error) {
+          loadingEl.hidden = true;
+          errorEl.hidden = false;
+          errorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .listInboxMessages();
+    }
+
+    // Sprint7⑤より、返信テンプレートはSheetsバックエンドの配列（テンプレート管理画面と共通）
+    // として取得する（従来のキー固定オブジェクトから変更）。
+    function loadReplyTemplates() {
+      google.script.run
+        .withSuccessHandler(function (templates) {
+          replyTemplates = templates || [];
+        })
+        .withFailureHandler(function (error) {
+          window.console && window.console.error(error);
+        })
+        .getReplyTemplates();
+    }
+
+    function showDetailLoading() {
+      detailEl.innerHTML = '<p class="empty-state">読み込み中...</p>';
+    }
+
+    function showDetailError(message) {
+      detailEl.innerHTML = '<p class="error-message">' + escapeHtml(message) + '</p>';
+    }
+
+    function showDetail(detail) {
+      // テンプレート管理画面（Sprint7⑤）で作成・削除された内容がそのまま反映されるよう、
+      // 固定4ボタンではなくreplyTemplates配列から動的に生成する。
+      var templateButtonsHtml = replyTemplates
+        .map(function (t) {
+          return (
+            '<button type="button" class="button button--secondary" data-template-id="' +
+            escapeHtml(t.templateId) +
+            '">' +
+            escapeHtml(t.displayName) +
+            '</button>'
+          );
+        })
+        .join('');
+
+      detailEl.innerHTML =
+        '<p><strong>件名:</strong> ' + escapeHtml(detail.subject) + '</p>' +
+        '<p><strong>送信者:</strong> ' + escapeHtml(detail.from) + '</p>' +
+        '<p><strong>宛先:</strong> ' + escapeHtml(detail.to) + '</p>' +
+        '<p><strong>日時:</strong> ' + escapeHtml(detail.date) + '</p>' +
+        '<pre>' + escapeHtml(detail.plainBody) + '</pre>' +
+        '<div class="template-buttons" id="template-buttons">' + templateButtonsHtml + '</div>' +
+        '<button type="button" class="button button--secondary" id="ai-reply-button">AI返信を作成</button>' +
+        '<textarea id="reply-textarea" rows="6" placeholder="返信を書く..."></textarea>' +
+        '<button type="button" class="button" id="reply-send-button">送信</button>';
+
+      document.getElementById('template-buttons').addEventListener('click', function (event) {
+        var button = event.target.closest('button[data-template-id]');
+        if (!button) {
+          return;
+        }
+        var template = replyTemplates.filter(function (t) {
+          return t.templateId === button.getAttribute('data-template-id');
+        })[0];
+        if (!template) {
+          return;
+        }
+        document.getElementById('reply-textarea').value = template.body;
+      });
+
+      document.getElementById('ai-reply-button').addEventListener('click', function () {
+        handleAiReplyClick(detail.threadId);
+      });
+
+      document.getElementById('reply-send-button').addEventListener('click', function () {
+        handleReplyClick(detail.threadId);
+      });
+    }
+
+    function handleAiReplyClick(threadId) {
+      var button = document.getElementById('ai-reply-button');
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '生成中...';
+      var toast = showToast('AI返信を生成しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (draft) {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          document.getElementById('reply-textarea').value = draft || '';
+          toast.close();
+        })
+        .withFailureHandler(function () {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          toast.update('AI返信生成に失敗しました', 'error');
+        })
+        .generateReplyDraft(threadId);
+    }
+
+    function handleReplyClick(threadId) {
+      var textarea = document.getElementById('reply-textarea');
+      var body = textarea.value;
+
+      if (!body) {
+        showToast('返信内容を入力してください', 'info');
+        return;
+      }
+
+      var confirmed = window.confirm(
+        '━━━━━━━━━━━━━━\n' +
+        '返信を送信します。\n\n' +
+        '送信後は取り消せません。\n\n' +
+        '送信しますか？\n' +
+        '━━━━━━━━━━━━━━'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      var button = document.getElementById('reply-send-button');
+      var originalText = button.textContent;
+      button.disabled = true;
+      button.classList.add('button--loading');
+      button.textContent = '送信中...';
+      var toast = showToast('返信を送信しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          toast.update('返信を送信しました。', 'success');
+          textarea.value = '';
+        })
+        .withFailureHandler(function () {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          button.textContent = originalText;
+          toast.update('返信送信に失敗しました', 'error');
+        })
+        .replyInboxMessage(threadId, body);
+    }
+
+    tbody.addEventListener('click', function (event) {
+      var row = event.target.closest('tr[data-thread-id]');
+      if (!row) {
+        return;
+      }
+      var threadId = row.getAttribute('data-thread-id');
+
+      showDetailLoading();
+
+      google.script.run
+        .withSuccessHandler(function (detail) {
+          showDetail(detail);
+        })
+        .withFailureHandler(function (error) {
+          showDetailError(error && error.message ? error.message : String(error));
+        })
+        .getInboxMessageDetail(threadId);
+    });
+
+    loadInbox();
+    loadReplyTemplates();
+  })();
+</script>

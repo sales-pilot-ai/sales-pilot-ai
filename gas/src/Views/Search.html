@@ -1,0 +1,192 @@
+<section class="search">
+  <form id="search-form" class="search__form">
+    <label>業種 <input type="text" id="search-industry" placeholder="例: IT" /></label>
+    <label>エリア <input type="text" id="search-area" placeholder="例: 東京" /></label>
+    <label>取得件数 <input type="number" id="search-limit" value="20" min="1" max="50" /></label>
+    <label class="search__checkbox">
+      <input type="checkbox" id="search-skip-analyzer" />
+      Webサイト解析をスキップする
+    </label>
+    <button type="submit" class="button" id="search-submit">検索実行</button>
+  </form>
+
+  <p id="search-error" class="error-message" hidden></p>
+  <p id="search-loading" class="empty-state" hidden>検索中です…</p>
+
+  <div id="search-review" class="search__review" hidden>
+    <p id="search-progress"></p>
+    <div class="candidate-card" id="candidate-card">
+      <div class="candidate-card__name" id="candidate-name"></div>
+      <div class="candidate-card__line" id="candidate-email"></div>
+      <div class="candidate-card__line" id="candidate-contact-form"></div>
+      <div class="candidate-card__line" id="candidate-website"></div>
+      <div class="candidate-card__line" id="candidate-address"></div>
+      <div class="candidate-card__line" id="candidate-industry"></div>
+      <div class="candidate-card__line" id="candidate-analysis" hidden></div>
+      <div class="candidate-card__actions">
+        <button type="button" class="button button--secondary" id="candidate-skip">スキップ</button>
+        <button type="button" class="button" id="candidate-save">保存</button>
+      </div>
+    </div>
+    <div class="search__bulk-actions">
+      <button type="button" class="button button--secondary" id="candidate-save-all">残りをすべて保存</button>
+      <button type="button" class="button button--secondary" id="candidate-finish">終了する</button>
+    </div>
+  </div>
+
+  <p id="search-summary" class="search__summary" hidden></p>
+</section>
+
+<script>
+  (function () {
+    var candidates = [];
+    var currentIndex = 0;
+    var counts = { created: 0, updated: 0, unchanged: 0, skipped: 0, error: 0 };
+
+    var form = document.getElementById('search-form');
+    var errorEl = document.getElementById('search-error');
+    var loadingEl = document.getElementById('search-loading');
+    var reviewEl = document.getElementById('search-review');
+    var summaryEl = document.getElementById('search-summary');
+    var progressEl = document.getElementById('search-progress');
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.hidden = false;
+    }
+
+    function renderSummary() {
+      summaryEl.hidden = false;
+      var remaining = Math.max(candidates.length - currentIndex, 0);
+      summaryEl.textContent =
+        'サマリー: 追加 ' +
+        counts.created +
+        '件 / 重複更新 ' +
+        counts.updated +
+        '件 / スキップ ' +
+        counts.skipped +
+        '件 / 残り ' +
+        remaining +
+        '件';
+    }
+
+    function renderCurrentCandidate() {
+      if (currentIndex >= candidates.length) {
+        reviewEl.hidden = true;
+        renderSummary();
+        return;
+      }
+      var candidate = candidates[currentIndex];
+      progressEl.textContent = '候補 ' + (currentIndex + 1) + '/' + candidates.length;
+      document.getElementById('candidate-name').textContent = candidate.companyName || '(会社名不明)';
+      document.getElementById('candidate-email').textContent = candidate.analysis
+        ? 'メールアドレス: ' + (candidate.email || '取得できませんでした')
+        : 'メールアドレス: 不明（未解析）';
+      document.getElementById('candidate-contact-form').textContent = candidate.analysis
+        ? 'お問い合わせフォーム: ' + (candidate.contactFormUrl || '取得できませんでした')
+        : 'お問い合わせフォーム: 不明（未解析）';
+      document.getElementById('candidate-website').textContent = candidate.websiteUrl || 'ホームページ: 不明';
+      document.getElementById('candidate-address').textContent =
+        [candidate.address, candidate.phone].filter(Boolean).join(' / ');
+      document.getElementById('candidate-industry').textContent = '業種: ' + (candidate.industry || '不明');
+
+      var analysisEl = document.getElementById('candidate-analysis');
+      if (candidate.analysis) {
+        var a = candidate.analysis;
+        var lines = ['Webサイト解析: 解析URL=' + (a.analyzedUrl || '(なし)')];
+        lines.push('HTTPステータス=' + (a.httpStatus === null ? '(取得前に失敗)' : a.httpStatus));
+        lines.push(a.success ? '取得成功' : '取得失敗: ' + (a.error || '不明なエラー'));
+        if (a.success) {
+          lines.push(a.email ? 'メール抽出成功' : 'メール抽出失敗: ' + (a.emailError || '不明なエラー'));
+          lines.push(a.contactFormUrl ? '問い合わせフォーム抽出成功' : '問い合わせフォーム抽出失敗: ' + (a.contactFormError || '不明なエラー'));
+        }
+        analysisEl.textContent = lines.join(' / ');
+        analysisEl.hidden = false;
+      } else {
+        analysisEl.hidden = true;
+      }
+
+      renderSummary();
+    }
+
+    function advance() {
+      currentIndex += 1;
+      renderCurrentCandidate();
+    }
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      errorEl.hidden = true;
+      loadingEl.hidden = false;
+      reviewEl.hidden = true;
+      summaryEl.hidden = true;
+
+      var params = {
+        industry: document.getElementById('search-industry').value,
+        area: document.getElementById('search-area').value,
+        limit: Number(document.getElementById('search-limit').value) || 20,
+        skipAnalyzer: document.getElementById('search-skip-analyzer').checked,
+      };
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          loadingEl.hidden = true;
+          candidates = result || [];
+          currentIndex = 0;
+          counts = { created: 0, updated: 0, unchanged: 0, skipped: 0, error: 0 };
+          if (candidates.length === 0) {
+            showError('該当する企業が見つかりませんでした。');
+            return;
+          }
+          reviewEl.hidden = false;
+          renderCurrentCandidate();
+        })
+        .withFailureHandler(function (error) {
+          loadingEl.hidden = true;
+          showError(error && error.message ? error.message : String(error));
+        })
+        .searchCompanies(params);
+    });
+
+    document.getElementById('candidate-skip').addEventListener('click', function () {
+      counts.skipped += 1;
+      advance();
+    });
+
+    document.getElementById('candidate-save').addEventListener('click', function () {
+      var candidate = candidates[currentIndex];
+      google.script.run
+        .withSuccessHandler(function (result) {
+          counts[result.status] = (counts[result.status] || 0) + 1;
+          advance();
+        })
+        .withFailureHandler(function (error) {
+          showError(error && error.message ? error.message : String(error));
+          counts.error += 1;
+          advance();
+        })
+        .saveCompanyCandidate(candidate);
+    });
+
+    document.getElementById('candidate-save-all').addEventListener('click', function () {
+      var remaining = candidates.slice(currentIndex);
+      google.script.run
+        .withSuccessHandler(function (results) {
+          (results || []).forEach(function (result) {
+            counts[result.status] = (counts[result.status] || 0) + 1;
+          });
+          currentIndex = candidates.length;
+          renderCurrentCandidate();
+        })
+        .withFailureHandler(function (error) {
+          showError(error && error.message ? error.message : String(error));
+        })
+        .saveAllCompanyCandidates(remaining);
+    });
+
+    document.getElementById('candidate-finish').addEventListener('click', function () {
+      currentIndex = candidates.length;
+      renderCurrentCandidate();
+    });
+  })();
+</script>

@@ -1,0 +1,101 @@
+<section class="report">
+  <p id="report-loading" class="empty-state">読み込み中…</p>
+  <p id="report-error" class="error-message" hidden></p>
+
+  <div id="report-content" hidden>
+    <div class="report__cards">
+      <div class="card card--metric">
+        <div class="card__icon" aria-hidden="true">🏢</div>
+        <div class="card__value card__value--metric" id="report-total">—</div>
+        <div class="card__label">営業件数</div>
+      </div>
+      <div class="card card--metric">
+        <div class="card__icon" aria-hidden="true">✅</div>
+        <div class="card__value card__value--metric" id="report-send-rate">—</div>
+        <div class="card__label">送信率</div>
+      </div>
+      <div class="card card--metric">
+        <div class="card__icon" aria-hidden="true">💬</div>
+        <div class="card__value card__value--metric" id="report-reply-rate">—</div>
+        <div class="card__label">返信率</div>
+      </div>
+      <div class="card card--metric">
+        <div class="card__icon" aria-hidden="true">🤝</div>
+        <div class="card__value card__value--metric" id="report-meeting-rate">—</div>
+        <div class="card__label">商談率</div>
+      </div>
+      <div class="card card--metric">
+        <div class="card__icon" aria-hidden="true">🏆</div>
+        <div class="card__value card__value--metric" id="report-win-rate">—</div>
+        <div class="card__label">成約率</div>
+      </div>
+    </div>
+
+    <div class="report__chart-section">
+      <h2>月別送信件数の推移（直近6か月）</h2>
+      <svg id="report-chart" class="report__chart" viewBox="0 0 480 220" role="img" aria-label="月別送信件数の推移"></svg>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function () {
+    var loadingEl = document.getElementById('report-loading');
+    var errorEl = document.getElementById('report-error');
+    var contentEl = document.getElementById('report-content');
+
+    function formatRate(rate) {
+      return rate != null ? rate + '%' : '—';
+    }
+
+    function renderChart(monthlySendCounts) {
+      var svg = document.getElementById('report-chart');
+      var width = 480;
+      var height = 220;
+      var padding = { top: 24, right: 16, bottom: 28, left: 16 };
+      var chartWidth = width - padding.left - padding.right;
+      var chartHeight = height - padding.top - padding.bottom;
+      var counts = monthlySendCounts.map(function (m) {
+        return m.count;
+      });
+      var maxCount = Math.max.apply(null, counts.concat([1]));
+      var barGap = 12;
+      var barWidth = (chartWidth - barGap * (monthlySendCounts.length - 1)) / monthlySendCounts.length;
+
+      var parts = monthlySendCounts.map(function (m, i) {
+        var barHeight = maxCount > 0 ? (m.count / maxCount) * chartHeight : 0;
+        var x = padding.left + i * (barWidth + barGap);
+        var y = padding.top + (chartHeight - barHeight);
+        var monthLabel = m.month.slice(5, 7) + '月';
+        return (
+          '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 1) + '" rx="4" fill="#1a73e8"></rect>' +
+          '<text x="' + (x + barWidth / 2) + '" y="' + (y - 6) + '" text-anchor="middle" font-size="11" fill="#5f6368">' + m.count + '</text>' +
+          '<text x="' + (x + barWidth / 2) + '" y="' + (height - 8) + '" text-anchor="middle" font-size="11" fill="#5f6368">' + monthLabel + '</text>'
+        );
+      });
+
+      svg.innerHTML = parts.join('');
+    }
+
+    google.script.run
+      .withSuccessHandler(function (stats) {
+        loadingEl.hidden = true;
+        stats = stats || {};
+        contentEl.hidden = false;
+
+        document.getElementById('report-total').textContent = stats.totalCount != null ? stats.totalCount : '—';
+        document.getElementById('report-send-rate').textContent = formatRate(stats.sendRate);
+        document.getElementById('report-reply-rate').textContent = formatRate(stats.replyRate);
+        document.getElementById('report-meeting-rate').textContent = formatRate(stats.meetingRate);
+        document.getElementById('report-win-rate').textContent = formatRate(stats.winRate);
+
+        renderChart(stats.monthlySendCounts || []);
+      })
+      .withFailureHandler(function (error) {
+        loadingEl.hidden = true;
+        errorEl.hidden = false;
+        errorEl.textContent = error && error.message ? error.message : String(error);
+      })
+      .getReportStats();
+  })();
+</script>

@@ -1,0 +1,140 @@
+<section class="settings">
+  <p id="settings-loading" class="empty-state">読み込み中…</p>
+  <p id="settings-error" class="error-message" hidden></p>
+
+  <form id="settings-form" hidden>
+    <div class="settings__section">
+      <h2>Gmail設定（送信者情報）</h2>
+      <p class="templates__placeholder-hint">
+        営業メール・返信メールの署名に使用する情報です。実際の送信は、ログイン中のGoogleアカウントのGmailから行われます。
+      </p>
+      <label>担当者名</label>
+      <input type="text" id="setting-sales-person-name" required />
+      <label>電話番号</label>
+      <input type="text" id="setting-sales-person-tel" required />
+      <label>メールアドレス</label>
+      <input type="email" id="setting-sales-person-mail" required />
+    </div>
+
+    <div class="settings__section">
+      <h2>Gemini API設定</h2>
+      <label>APIキー <span id="setting-gemini-api-key-status" class="settings__key-status"></span></label>
+      <input type="password" id="setting-gemini-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
+      <label>使用モデル</label>
+      <input type="text" id="setting-gemini-model" />
+    </div>
+
+    <div class="settings__section">
+      <h2>システム設定</h2>
+      <label>スプレッドシートID</label>
+      <input type="text" id="setting-spreadsheet-id" required />
+      <label>Google Maps APIキー <span id="setting-maps-api-key-status" class="settings__key-status"></span></label>
+      <input type="password" id="setting-maps-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
+    </div>
+
+    <div class="settings__section">
+      <h2>デフォルト値設定</h2>
+      <label>TimeRex（日程調整）URL</label>
+      <input type="text" id="setting-timerex-url" />
+    </div>
+
+    <button type="submit" class="button" id="settings-save-button">保存</button>
+  </form>
+</section>
+
+<script>
+  (function () {
+    var loadingEl = document.getElementById('settings-loading');
+    var errorEl = document.getElementById('settings-error');
+    var formEl = document.getElementById('settings-form');
+
+    var salesPersonNameInput = document.getElementById('setting-sales-person-name');
+    var salesPersonTelInput = document.getElementById('setting-sales-person-tel');
+    var salesPersonMailInput = document.getElementById('setting-sales-person-mail');
+    var geminiApiKeyInput = document.getElementById('setting-gemini-api-key');
+    var geminiApiKeyStatusEl = document.getElementById('setting-gemini-api-key-status');
+    var geminiModelInput = document.getElementById('setting-gemini-model');
+    var spreadsheetIdInput = document.getElementById('setting-spreadsheet-id');
+    var mapsApiKeyInput = document.getElementById('setting-maps-api-key');
+    var mapsApiKeyStatusEl = document.getElementById('setting-maps-api-key-status');
+    var timeRexUrlInput = document.getElementById('setting-timerex-url');
+
+    function loadSettings() {
+      loadingEl.hidden = false;
+      errorEl.hidden = true;
+      formEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (settings) {
+          loadingEl.hidden = true;
+          formEl.hidden = false;
+          applySettings(settings || {});
+        })
+        .withFailureHandler(function (error) {
+          loadingEl.hidden = true;
+          errorEl.hidden = false;
+          errorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .getSettings();
+    }
+
+    // APIキーの入力欄は常に空欄のまま表示する（値そのものは画面へ返さない設計。
+    // 「設定済み/未設定」のみをラベル横に表示し、変更したい場合だけ入力してもらう）。
+    function applySettings(settings) {
+      salesPersonNameInput.value = settings.salesPersonName || '';
+      salesPersonTelInput.value = settings.salesPersonTel || '';
+      salesPersonMailInput.value = settings.salesPersonMail || '';
+      geminiModelInput.value = settings.geminiModel || '';
+      spreadsheetIdInput.value = settings.spreadsheetId || '';
+      timeRexUrlInput.value = settings.timeRexUrl || '';
+      geminiApiKeyInput.value = '';
+      mapsApiKeyInput.value = '';
+      geminiApiKeyStatusEl.textContent = settings.geminiApiKeySet ? '（設定済み）' : '（未設定）';
+      mapsApiKeyStatusEl.textContent = settings.mapsApiKeySet ? '（設定済み）' : '（未設定）';
+    }
+
+    formEl.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      var data = {
+        salesPersonName: salesPersonNameInput.value,
+        salesPersonTel: salesPersonTelInput.value,
+        salesPersonMail: salesPersonMailInput.value,
+        geminiModel: geminiModelInput.value,
+        spreadsheetId: spreadsheetIdInput.value,
+        timeRexUrl: timeRexUrlInput.value,
+      };
+      // 空欄のまま送信した場合は既存のAPIキーを変更しない（Config/Settings.jsのupdateSettings_参照）。
+      if (geminiApiKeyInput.value) {
+        data.geminiApiKey = geminiApiKeyInput.value;
+      }
+      if (mapsApiKeyInput.value) {
+        data.mapsApiKey = mapsApiKeyInput.value;
+      }
+
+      var saveButton = document.getElementById('settings-save-button');
+      var originalText = saveButton.textContent;
+      saveButton.disabled = true;
+      saveButton.classList.add('button--loading');
+      var toast = showToast('保存しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (settings) {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          saveButton.textContent = originalText;
+          toast.update('設定を保存しました。', 'success');
+          applySettings(settings || {});
+        })
+        .withFailureHandler(function (error) {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          saveButton.textContent = originalText;
+          toast.update('保存に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .updateSettings(data);
+    });
+
+    loadSettings();
+  })();
+</script>
