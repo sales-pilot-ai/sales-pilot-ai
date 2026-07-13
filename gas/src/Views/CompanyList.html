@@ -1,4 +1,15 @@
-<section class="company-list" id="company-list-root">
+<section class="sales-management" id="sales-management-root">
+  <div class="sales-tabs" id="sales-tabs">
+    <button type="button" class="sales-tabs__tab is-active" data-sales-tab="list">営業リスト</button>
+    <button type="button" class="sales-tabs__tab" data-sales-tab="send">
+      一括送信 <span class="sales-tabs__badge" id="send-tab-badge" hidden>0</span>
+    </button>
+    <button type="button" class="sales-tabs__tab" data-sales-tab="reply">
+      返信確認 <span class="sales-tabs__badge" id="reply-tab-badge" hidden>0</span>
+    </button>
+  </div>
+
+<div class="company-list sales-tab-panel" id="company-list-root">
   <div class="company-list__status-undo-bar" id="status-undo-bar" hidden>
     <span>ステータスを更新しました。</span>
     <button type="button" class="button button--secondary" id="status-undo-button">元に戻す</button>
@@ -61,10 +72,13 @@
       <tr>
         <th><input type="checkbox" id="select-all-checkbox" aria-label="全選択" /></th>
         <th>会社名</th>
+        <th>担当者</th>
+        <th>メールアドレス</th>
         <th>業種</th>
         <th>エリア</th>
         <th>送信状況</th>
         <th>返信有無</th>
+        <th>現在ステータス</th>
         <th>商談日</th>
         <th>成約</th>
         <th>最終更新</th>
@@ -119,6 +133,73 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- 一括送信タブ（Sprint8④-2）: まだ初回メールを送信していない企業のみ表示し、
+     テンプレートを選択して一括送信する。既存のテンプレート管理画面（Sprint7⑤）のデータを
+     listSalesTemplates()でそのまま参照し、新しいテンプレート管理UIは作らない。 -->
+<div class="sales-tab-panel" id="send-tab-panel" hidden>
+  <div class="company-list__selection">
+    <span id="send-selection-count">選択中：0件</span>
+    <div id="send-bulk-progress" class="company-list__bulk-progress" hidden>
+      <span id="send-progress-label" class="company-list__bulk-progress-label"></span>
+      <div class="progress-bar" id="send-progress-bar" role="progressbar" aria-label="送信の進捗" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar__fill" id="send-progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sales-send__toolbar">
+    <label for="send-template-select">送信テンプレート</label>
+    <select id="send-template-select"></select>
+    <button type="button" class="button" id="send-tab-send-button">選択した企業へ一括送信</button>
+  </div>
+
+  <p id="send-list-loading" class="empty-state">読み込み中…</p>
+  <p id="send-list-empty" class="empty-state" hidden>未送信の企業はありません。</p>
+
+  <table class="company-table" id="send-table" hidden>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="send-select-all-checkbox" aria-label="全選択" /></th>
+        <th>会社名</th>
+        <th>担当者</th>
+        <th>メールアドレス</th>
+        <th>業種</th>
+      </tr>
+    </thead>
+    <tbody id="send-table-body"></tbody>
+  </table>
+</div>
+
+<!-- 返信確認タブ（Sprint8④-3）: 新着返信（初回）／継続返信の2サブタブ。 -->
+<div class="sales-tab-panel" id="reply-tab-panel" hidden>
+  <div class="sales-subtabs" id="reply-subtabs">
+    <button type="button" class="sales-subtabs__tab is-active" data-reply-subtab="new">
+      新着返信 <span class="sales-tabs__badge" id="new-reply-subtab-badge" hidden>0</span>
+    </button>
+    <button type="button" class="sales-subtabs__tab" data-reply-subtab="ongoing">継続返信</button>
+  </div>
+
+  <div class="sales-tab-panel" id="reply-new-panel">
+    <p id="reply-new-loading" class="empty-state">読み込み中…</p>
+    <p id="reply-new-empty" class="empty-state" hidden>新着の返信はありません。</p>
+    <div id="reply-new-list" class="reply-new-list"></div>
+  </div>
+
+  <div class="sales-tab-panel" id="reply-ongoing-panel" hidden>
+    <div class="reply-chat">
+      <div class="reply-chat__list">
+        <p id="reply-ongoing-loading" class="empty-state">読み込み中…</p>
+        <p id="reply-ongoing-empty" class="empty-state" hidden>継続対応中の企業はありません。</p>
+        <ul id="reply-ongoing-company-list" class="reply-chat__company-list"></ul>
+      </div>
+      <div class="reply-chat__thread" id="reply-chat-thread">
+        <p class="empty-state">左の一覧から企業を選択してください。</p>
+      </div>
+    </div>
+  </div>
+</div>
 </section>
 
 <script>
@@ -220,6 +301,42 @@
       return d.getFullYear() + '-' + mm + '-' + dd;
     }
 
+    // 営業管理「営業リスト」タブ（Sprint8④-1）は、初回メール送信済みの企業のみを対象とする
+    // （未送信の企業は「一括送信」タブの対象）。読み取り専用のクライアント側フィルタで、
+    // サーバー側のlistCompaniesFromSheet_は変更しない。
+    function applyTabBaseFilter(companies) {
+      return companies.filter(function (c) {
+        return c.sendStatus !== '未送信';
+      });
+    }
+
+    // 営業リストタブの「現在ステータス」列（Sprint8④-1）。既存の送信状況・返信有無・商談日・
+    // 成約の各フィールドから表示用ラベルを計算するだけで、新しい列・書き込み処理は追加しない。
+    function computeCurrentStatusLabel(c) {
+      if (c.dealResult === '成約') {
+        return '成約';
+      }
+      if (c.dealResult === '失注') {
+        return '失注';
+      }
+      if (c.sendStatus === '保留') {
+        return '保留';
+      }
+      if (c.meetingDate) {
+        return '商談中';
+      }
+      if (c.hasReply === '返信あり' && c.sendStatus === '対応中') {
+        return '対応中';
+      }
+      if (c.hasReply === '返信あり') {
+        return '要対応';
+      }
+      if (c.sendStatus === '送信済') {
+        return '返信待ち';
+      }
+      return c.sendStatus || '—';
+    }
+
     // 既存のキーワード・業種・送信状況・送信可否の絞り込み結果（allCompanies）に対して、
     // クライアント側でさらにステータスの簡易フィルタを重ねる（読み取り専用・サーバー側の
     // listCompaniesFromSheet_は変更しない）。
@@ -273,7 +390,7 @@
       selectAllCheckbox.checked = false;
       updateSelectionUI();
 
-      var filteredCompanies = applyStatusQuickFilter(allCompanies);
+      var filteredCompanies = applyStatusQuickFilter(applyTabBaseFilter(allCompanies));
 
       if (filteredCompanies.length === 0) {
         tableEl.hidden = true;
@@ -295,10 +412,13 @@
             '<tr data-company-id="' + escapeHtml(c.companyId) + '">' +
             '<td><input type="checkbox" class="row-select-checkbox" data-company-id="' + escapeHtml(c.companyId) + '" aria-label="選択" /></td>' +
             '<td>' + escapeHtml(c.companyName) + '</td>' +
+            '<td>' + escapeHtml(c.ownerName) + '</td>' +
+            '<td>' + escapeHtml(c.email) + '</td>' +
             '<td>' + escapeHtml(c.industry) + '</td>' +
             '<td>' + escapeHtml(c.area) + '</td>' +
             '<td>' + escapeHtml(c.sendStatus) + '</td>' +
             '<td>' + escapeHtml(c.hasReply) + '</td>' +
+            '<td>' + escapeHtml(computeCurrentStatusLabel(c)) + '</td>' +
             '<td>' + escapeHtml(c.meetingDate) + '</td>' +
             '<td>' + escapeHtml(c.dealResult) + '</td>' +
             '<td>' + escapeHtml(c.updatedAt) + '</td>' +
@@ -1160,5 +1280,668 @@
     }
 
     loadCompanies(currentFilter);
+
+    // ============================================================
+    // Sprint8④ 営業管理タブ（営業リスト／一括送信／返信確認）
+    // 営業リストタブは既存のCompanyList実装をそのまま使う（上記コード）。
+    // 以下は新設した一括送信・返信確認タブの実装。既存のRouter関数
+    // （listCompanies/listSalesTemplates/analyzeCompanyInfo/generateSalesDraft/
+    // sendSalesMail/listInboxMessages/updateCompanyStatus/generateReplyDraft/
+    // listCompanyMailHistory/replyInboxMessage）をそのまま呼び出すだけで、
+    // 新しいSheets書き込みロジックは追加しない（summarizeReplyのみSprint8で新設）。
+    // ============================================================
+
+    var salesTabsEl = document.getElementById('sales-tabs');
+    var listTabPanel = document.getElementById('company-list-root');
+    var sendTabPanel = document.getElementById('send-tab-panel');
+    var replyTabPanel = document.getElementById('reply-tab-panel');
+    var sendTabLoaded = false;
+    var replyTabLoaded = false;
+
+    function setActiveSalesTab(tabKey) {
+      Array.prototype.forEach.call(salesTabsEl.querySelectorAll('[data-sales-tab]'), function (btn) {
+        btn.classList.toggle('is-active', btn.getAttribute('data-sales-tab') === tabKey);
+      });
+      listTabPanel.hidden = tabKey !== 'list';
+      sendTabPanel.hidden = tabKey !== 'send';
+      replyTabPanel.hidden = tabKey !== 'reply';
+
+      if (tabKey === 'send' && !sendTabLoaded) {
+        sendTabLoaded = true;
+        loadSendTab();
+      }
+      if (tabKey === 'reply' && !replyTabLoaded) {
+        replyTabLoaded = true;
+        loadReplyTab();
+      }
+    }
+
+    salesTabsEl.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-sales-tab]');
+      if (!btn) {
+        return;
+      }
+      setActiveSalesTab(btn.getAttribute('data-sales-tab'));
+    });
+
+    // --- 一括送信タブ（Sprint8④-2） ---
+
+    var sendCompanies = [];
+    var selectedSendCompanyIds = {};
+    var sendLoadingEl = document.getElementById('send-list-loading');
+    var sendEmptyEl = document.getElementById('send-list-empty');
+    var sendTableEl = document.getElementById('send-table');
+    var sendTbody = document.getElementById('send-table-body');
+    var sendSelectAllCheckbox = document.getElementById('send-select-all-checkbox');
+    var sendSelectionCountEl = document.getElementById('send-selection-count');
+    var sendTemplateSelect = document.getElementById('send-template-select');
+    var sendTabSendButton = document.getElementById('send-tab-send-button');
+    var sendBulkProgressEl = document.getElementById('send-bulk-progress');
+    var sendProgressLabelEl = document.getElementById('send-progress-label');
+    var sendProgressBarEl = document.getElementById('send-progress-bar');
+    var sendProgressFillEl = document.getElementById('send-progress-fill');
+
+    function updateSendSelectionUI() {
+      sendSelectionCountEl.textContent = '選択中：' + Object.keys(selectedSendCompanyIds).length + '件';
+    }
+
+    function renderSendTable() {
+      var badge = document.getElementById('send-tab-badge');
+      if (sendCompanies.length === 0) {
+        sendTableEl.hidden = true;
+        sendEmptyEl.hidden = false;
+        badge.hidden = true;
+        return;
+      }
+      sendEmptyEl.hidden = true;
+      sendTableEl.hidden = false;
+      badge.hidden = false;
+      badge.textContent = String(sendCompanies.length);
+
+      sendTbody.innerHTML = sendCompanies
+        .map(function (c) {
+          return (
+            '<tr data-company-id="' + escapeHtml(c.companyId) + '">' +
+            '<td><input type="checkbox" class="send-row-checkbox" data-company-id="' + escapeHtml(c.companyId) + '" aria-label="選択" /></td>' +
+            '<td>' + escapeHtml(c.companyName) + '</td>' +
+            '<td>' + escapeHtml(c.ownerName) + '</td>' +
+            '<td>' + escapeHtml(c.email) + '</td>' +
+            '<td>' + escapeHtml(c.industry) + '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    }
+
+    function loadSendTab() {
+      sendLoadingEl.hidden = false;
+      sendTableEl.hidden = true;
+      selectedSendCompanyIds = {};
+      updateSendSelectionUI();
+
+      google.script.run
+        .withSuccessHandler(function (companies) {
+          sendLoadingEl.hidden = true;
+          sendCompanies = (companies || []).filter(function (c) {
+            return c.sendApproval === '○' && c.sendStatus === '未送信';
+          });
+          renderSendTable();
+        })
+        .withFailureHandler(function (error) {
+          sendLoadingEl.hidden = true;
+          showToast('一括送信対象の取得に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .listCompanies({});
+
+      google.script.run
+        .withSuccessHandler(function (templates) {
+          templates = templates || [];
+          sendTemplateSelect.innerHTML = templates
+            .map(function (t) {
+              return '<option value="' + escapeHtml(t.templateId) + '">' + escapeHtml(t.displayName) + (t.isDefault ? '（デフォルト）' : '') + '</option>';
+            })
+            .join('');
+          var defaultTemplate = templates.filter(function (t) {
+            return t.isDefault;
+          })[0];
+          if (defaultTemplate) {
+            sendTemplateSelect.value = defaultTemplate.templateId;
+          }
+        })
+        .withFailureHandler(function (error) {
+          showToast('テンプレート一覧の取得に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .listSalesTemplates();
+    }
+
+    sendSelectAllCheckbox.addEventListener('change', function () {
+      var checked = sendSelectAllCheckbox.checked;
+      Array.prototype.forEach.call(sendTbody.querySelectorAll('.send-row-checkbox'), function (cb) {
+        cb.checked = checked;
+        var id = cb.getAttribute('data-company-id');
+        if (checked) {
+          selectedSendCompanyIds[id] = true;
+        } else {
+          delete selectedSendCompanyIds[id];
+        }
+      });
+      updateSendSelectionUI();
+    });
+
+    sendTbody.addEventListener('change', function (event) {
+      var cb = event.target.closest('.send-row-checkbox');
+      if (!cb) {
+        return;
+      }
+      var id = cb.getAttribute('data-company-id');
+      if (cb.checked) {
+        selectedSendCompanyIds[id] = true;
+      } else {
+        delete selectedSendCompanyIds[id];
+      }
+      updateSendSelectionUI();
+    });
+
+    function showSendProgress(label, current, total) {
+      sendBulkProgressEl.hidden = false;
+      sendProgressLabelEl.textContent = label + '... ' + current + ' / ' + total;
+      var percent = total > 0 ? Math.round((current / total) * 100) : 0;
+      sendProgressFillEl.style.width = percent + '%';
+      sendProgressBarEl.setAttribute('aria-valuenow', String(percent));
+    }
+
+    function hideSendProgress() {
+      sendBulkProgressEl.hidden = true;
+      sendProgressLabelEl.textContent = '';
+      sendProgressFillEl.style.width = '0%';
+      sendProgressBarEl.removeAttribute('aria-valuenow');
+    }
+
+    // 選択企業を1件ずつ、既存のAI分析→営業メール生成（選択テンプレート指定）→送信の順で
+    // 呼び出す（いずれも既存Router関数。一括送信専用の新しいSheets書き込みは追加しない）。
+    function runSendTabBatch(companyIds, templateId, index, successCount, failureCount, onComplete) {
+      if (index >= companyIds.length) {
+        onComplete(successCount, failureCount);
+        return;
+      }
+      var companyId = companyIds[index];
+      showSendProgress('送信中', index + 1, companyIds.length);
+
+      function next(success) {
+        runSendTabBatch(companyIds, templateId, index + 1, successCount + (success ? 1 : 0), failureCount + (success ? 0 : 1), onComplete);
+      }
+
+      function proceedToDraft() {
+        google.script.run
+          .withSuccessHandler(function (draftResult) {
+            if (!draftResult || draftResult.draftStatus !== '成功') {
+              next(false);
+              return;
+            }
+            google.script.run
+              .withSuccessHandler(function () {
+                next(true);
+              })
+              .withFailureHandler(function () {
+                next(false);
+              })
+              .sendSalesMail(companyId);
+          })
+          .withFailureHandler(function () {
+            next(false);
+          })
+          .generateSalesDraft(companyId, null, templateId);
+      }
+
+      google.script.run.withSuccessHandler(proceedToDraft).withFailureHandler(proceedToDraft).analyzeCompanyInfo(companyId);
+    }
+
+    sendTabSendButton.addEventListener('click', function () {
+      var companyIds = Object.keys(selectedSendCompanyIds);
+      if (companyIds.length === 0) {
+        showToast('送信する企業を選択してください。', 'info');
+        return;
+      }
+      var templateId = sendTemplateSelect.value;
+      if (!templateId) {
+        showToast('送信テンプレートを選択してください。', 'info');
+        return;
+      }
+      var confirmed = window.confirm(
+        '━━━━━━━━━━━━━━━━━━\n' +
+        companyIds.length + '件の企業へ営業メールを送信します。\n\n' +
+        '送信後は取り消せません。\n\n' +
+        '送信しますか？\n' +
+        '━━━━━━━━━━━━━━━━━━'
+      );
+      if (!confirmed) {
+        return;
+      }
+
+      sendTabSendButton.disabled = true;
+      sendTabSendButton.classList.add('button--loading');
+
+      runSendTabBatch(companyIds, templateId, 0, 0, 0, function (successCount, failureCount) {
+        sendTabSendButton.disabled = false;
+        sendTabSendButton.classList.remove('button--loading');
+        hideSendProgress();
+        showToast('送信完了\n\n成功 ' + successCount + '件\n失敗 ' + failureCount + '件', failureCount > 0 ? 'error' : 'success');
+        selectedSendCompanyIds = {};
+        sendSelectAllCheckbox.checked = false;
+        updateSendSelectionUI();
+        // 送信成功した企業はsendStatusが更新され、一括送信タブの対象からは外れ、
+        // 営業リストタブ（初回送信済み企業のみ表示）に自動的に現れるようになる（Sprint8④-2）。
+        loadSendTab();
+        loadCompanies(currentFilter);
+      });
+    });
+
+    // --- 返信確認タブ（Sprint8④-3） ---
+
+    var replySubtabsEl = document.getElementById('reply-subtabs');
+    var replyNewPanel = document.getElementById('reply-new-panel');
+    var replyOngoingPanel = document.getElementById('reply-ongoing-panel');
+    var replyOngoingLoaded = false;
+
+    function setActiveReplySubtab(key) {
+      Array.prototype.forEach.call(replySubtabsEl.querySelectorAll('[data-reply-subtab]'), function (btn) {
+        btn.classList.toggle('is-active', btn.getAttribute('data-reply-subtab') === key);
+      });
+      replyNewPanel.hidden = key !== 'new';
+      replyOngoingPanel.hidden = key !== 'ongoing';
+      if (key === 'ongoing' && !replyOngoingLoaded) {
+        replyOngoingLoaded = true;
+        loadOngoingReplyTab();
+      }
+    }
+
+    replySubtabsEl.addEventListener('click', function (event) {
+      var btn = event.target.closest('[data-reply-subtab]');
+      if (!btn) {
+        return;
+      }
+      setActiveReplySubtab(btn.getAttribute('data-reply-subtab'));
+    });
+
+    function loadReplyTab() {
+      loadNewReplyTab();
+    }
+
+    function extractEmailFromFrom(from) {
+      var match = String(from || '').match(/<([^<>]+)>/);
+      return (match ? match[1] : from || '').trim().toLowerCase();
+    }
+
+    // listCompanies()とlistInboxMessages()（いずれも既存Router関数）を並行に呼び、
+    // 両方そろってから処理する（新しい集計用Router関数は追加しない）。
+    function parallelLoadCompaniesAndInbox(onSuccess, onFailure) {
+      var companies = null;
+      var inboxMessages = null;
+      var failed = false;
+
+      function checkDone() {
+        if (!failed && companies !== null && inboxMessages !== null) {
+          onSuccess(companies, inboxMessages);
+        }
+      }
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          companies = result || [];
+          checkDone();
+        })
+        .withFailureHandler(function (error) {
+          failed = true;
+          onFailure(error);
+        })
+        .listCompanies({});
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          inboxMessages = result || [];
+          checkDone();
+        })
+        .withFailureHandler(function (error) {
+          failed = true;
+          onFailure(error);
+        })
+        .listInboxMessages();
+    }
+
+    // --- 新着返信（初回） ---
+    var newReplyCompanies = [];
+    var newReplyLoadingEl = document.getElementById('reply-new-loading');
+    var newReplyEmptyEl = document.getElementById('reply-new-empty');
+    var newReplyListEl = document.getElementById('reply-new-list');
+
+    function loadNewReplyTab() {
+      newReplyLoadingEl.hidden = false;
+      newReplyEmptyEl.hidden = true;
+      newReplyListEl.innerHTML = '';
+
+      parallelLoadCompaniesAndInbox(
+        function (companies, inboxMessages) {
+          newReplyLoadingEl.hidden = true;
+          var emailToMessage = {};
+          inboxMessages.forEach(function (m) {
+            emailToMessage[extractEmailFromFrom(m.from)] = m;
+          });
+
+          // 新着返信（初回）＝返信ありかつ「対応中」（対応済みにする、を押していない）かつ
+          // 商談・成約もまだ発生していない企業（FollowUpService.jsの「未対応」判定と同じ考え方）。
+          newReplyCompanies = companies
+            .filter(function (c) {
+              return c.hasReply === '返信あり' && c.sendStatus !== '対応中' && !c.dealResult;
+            })
+            .map(function (c) {
+              var message = emailToMessage[String(c.email || '').trim().toLowerCase()];
+              return Object.assign({}, c, {
+                threadId: message ? message.threadId : null,
+                snippet: message ? message.snippet : '',
+              });
+            });
+
+          var subtabBadge = document.getElementById('new-reply-subtab-badge');
+          var tabBadge = document.getElementById('reply-tab-badge');
+          if (newReplyCompanies.length > 0) {
+            subtabBadge.hidden = false;
+            subtabBadge.textContent = String(newReplyCompanies.length);
+            tabBadge.hidden = false;
+            tabBadge.textContent = String(newReplyCompanies.length);
+          } else {
+            subtabBadge.hidden = true;
+            tabBadge.hidden = true;
+          }
+
+          if (newReplyCompanies.length === 0) {
+            newReplyEmptyEl.hidden = false;
+            return;
+          }
+          renderNewReplyList();
+        },
+        function (error) {
+          newReplyLoadingEl.hidden = true;
+          showToast('新着返信の取得に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        }
+      );
+    }
+
+    function findNewReplyCompany(companyId) {
+      return newReplyCompanies.filter(function (c) {
+        return c.companyId === companyId;
+      })[0];
+    }
+
+    function renderNewReplyList() {
+      newReplyListEl.innerHTML = newReplyCompanies
+        .map(function (c) {
+          return (
+            '<div class="reply-card" data-company-id="' + escapeHtml(c.companyId) + '">' +
+            '<div class="reply-card__header">' +
+            '<span class="reply-card__company">' + escapeHtml(c.companyName) + '</span>' +
+            '<span class="reply-card__owner">' + escapeHtml(c.ownerName) + '</span>' +
+            '</div>' +
+            '<p class="reply-card__snippet">' + escapeHtml(c.snippet || '(本文プレビューなし)') + '</p>' +
+            '<div class="reply-card__ai" id="reply-ai-' + escapeHtml(c.companyId) + '" hidden></div>' +
+            '<div class="reply-card__actions">' +
+            '<button type="button" class="button button--secondary" data-action="ai-summary">AI要約を見る</button>' +
+            '<button type="button" class="button button--secondary" data-action="ai-suggest">AIがおすすめする返信内容</button>' +
+            '<button type="button" class="button" data-action="resolve">対応済みにする</button>' +
+            '</div>' +
+            '</div>'
+          );
+        })
+        .join('');
+    }
+
+    newReplyListEl.addEventListener('click', function (event) {
+      var card = event.target.closest('.reply-card[data-company-id]');
+      if (!card) {
+        return;
+      }
+      var companyId = card.getAttribute('data-company-id');
+      var company = findNewReplyCompany(companyId);
+      if (!company) {
+        return;
+      }
+      var aiBox = document.getElementById('reply-ai-' + companyId);
+
+      var summaryBtn = event.target.closest('[data-action="ai-summary"]');
+      if (summaryBtn) {
+        if (!company.threadId) {
+          showToast('対象の受信メールが見つかりませんでした。', 'info');
+          return;
+        }
+        summaryBtn.disabled = true;
+        summaryBtn.classList.add('button--loading');
+        google.script.run
+          .withSuccessHandler(function (summary) {
+            summaryBtn.disabled = false;
+            summaryBtn.classList.remove('button--loading');
+            aiBox.hidden = false;
+            aiBox.textContent = 'AI要約: ' + summary;
+          })
+          .withFailureHandler(function (error) {
+            summaryBtn.disabled = false;
+            summaryBtn.classList.remove('button--loading');
+            showToast('AI要約に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .summarizeReply(company.threadId);
+        return;
+      }
+
+      var suggestBtn = event.target.closest('[data-action="ai-suggest"]');
+      if (suggestBtn) {
+        if (!company.threadId) {
+          showToast('対象の受信メールが見つかりませんでした。', 'info');
+          return;
+        }
+        suggestBtn.disabled = true;
+        suggestBtn.classList.add('button--loading');
+        google.script.run
+          .withSuccessHandler(function (draft) {
+            suggestBtn.disabled = false;
+            suggestBtn.classList.remove('button--loading');
+            aiBox.hidden = false;
+            aiBox.textContent = 'AIがおすすめする返信内容: ' + draft;
+          })
+          .withFailureHandler(function (error) {
+            suggestBtn.disabled = false;
+            suggestBtn.classList.remove('button--loading');
+            showToast('AI返信案の生成に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .generateReplyDraft(company.threadId);
+        return;
+      }
+
+      var resolveBtn = event.target.closest('[data-action="resolve"]');
+      if (resolveBtn) {
+        resolveBtn.disabled = true;
+        resolveBtn.classList.add('button--loading');
+        google.script.run
+          .withSuccessHandler(function () {
+            showToast('対応済みにしました。継続返信タブへ移動しました。', 'success');
+            loadNewReplyTab();
+            replyOngoingLoaded = false;
+          })
+          .withFailureHandler(function (error) {
+            resolveBtn.disabled = false;
+            resolveBtn.classList.remove('button--loading');
+            showToast('更新に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .updateCompanyStatus(companyId, '対応中');
+      }
+    });
+
+    // --- 継続返信（チャットUI） ---
+    var ongoingCompanies = [];
+    var ongoingLoadingEl = document.getElementById('reply-ongoing-loading');
+    var ongoingEmptyEl = document.getElementById('reply-ongoing-empty');
+    var ongoingListEl = document.getElementById('reply-ongoing-company-list');
+    var chatThreadEl = document.getElementById('reply-chat-thread');
+
+    function loadOngoingReplyTab() {
+      ongoingLoadingEl.hidden = false;
+      ongoingEmptyEl.hidden = true;
+      ongoingListEl.innerHTML = '';
+
+      google.script.run
+        .withSuccessHandler(function (companies) {
+          ongoingLoadingEl.hidden = true;
+          ongoingCompanies = (companies || []).filter(function (c) {
+            return c.hasReply === '返信あり' && c.sendStatus === '対応中';
+          });
+          if (ongoingCompanies.length === 0) {
+            ongoingEmptyEl.hidden = false;
+            return;
+          }
+          renderOngoingCompanyList();
+        })
+        .withFailureHandler(function (error) {
+          ongoingLoadingEl.hidden = true;
+          showToast('継続返信の取得に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .listCompanies({});
+    }
+
+    function renderOngoingCompanyList() {
+      ongoingListEl.innerHTML = ongoingCompanies
+        .map(function (c) {
+          return (
+            '<li><button type="button" class="reply-chat__company-button" data-company-id="' + escapeHtml(c.companyId) + '">' +
+            '<span class="reply-chat__company-name">' + escapeHtml(c.companyName) + '</span>' +
+            '<span class="reply-chat__company-owner">' + escapeHtml(c.ownerName) + '</span>' +
+            '</button></li>'
+          );
+        })
+        .join('');
+    }
+
+    ongoingListEl.addEventListener('click', function (event) {
+      var btn = event.target.closest('.reply-chat__company-button');
+      if (!btn) {
+        return;
+      }
+      var companyId = btn.getAttribute('data-company-id');
+      Array.prototype.forEach.call(ongoingListEl.querySelectorAll('.reply-chat__company-button'), function (b) {
+        b.classList.toggle('is-active', b.getAttribute('data-company-id') === companyId);
+      });
+      loadChatThread(companyId);
+    });
+
+    function loadChatThread(companyId) {
+      chatThreadEl.innerHTML = '<p class="empty-state">読み込み中…</p>';
+      google.script.run
+        .withSuccessHandler(function (threads) {
+          renderChatThread(companyId, threads || []);
+        })
+        .withFailureHandler(function (error) {
+          chatThreadEl.innerHTML = '<p class="error-message">' + escapeHtml(error && error.message ? error.message : String(error)) + '</p>';
+        })
+        .listCompanyMailHistory(companyId);
+    }
+
+    function renderChatThread(companyId, threads) {
+      // GmailApp.search()は新しい順にスレッドを返すため（MailHistoryService.js参照）、
+      // 最新スレッド（返信対象）はthreads[0]。
+      var latestThreadId = threads.length > 0 ? threads[0].threadId : null;
+      var allMessages = [];
+      threads.forEach(function (thread) {
+        thread.messages.forEach(function (m) {
+          allMessages.push(m);
+        });
+      });
+      // 日時は'yyyy-MM-dd HH:mm:ss'形式（文字列比較=時系列順）で並べ替え、
+      // 複数スレッドをまたいでも時系列でチャット表示できるようにする。
+      allMessages.sort(function (a, b) {
+        return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+      });
+
+      var messagesHtml = allMessages
+        .map(function (m) {
+          var isSent = m.direction === '送信';
+          return (
+            '<div class="reply-chat__message reply-chat__message--' + (isSent ? 'sent' : 'received') + '">' +
+            '<div class="reply-chat__bubble">' + escapeHtml(m.body).replace(/\n/g, '<br>') + '</div>' +
+            '<div class="reply-chat__meta">' + escapeHtml(m.date) + '</div>' +
+            '</div>'
+          );
+        })
+        .join('');
+
+      chatThreadEl.innerHTML =
+        '<div class="reply-chat__messages" id="reply-chat-messages">' + messagesHtml + '</div>' +
+        '<div class="reply-chat__attachment-placeholder">📎 添付ファイル（今後対応予定）</div>' +
+        '<div class="reply-chat__composer">' +
+        '<button type="button" class="button button--secondary" id="chat-ai-suggest-button">AI返信案を作成</button>' +
+        '<textarea id="chat-reply-textarea" rows="4" placeholder="返信を書く..."></textarea>' +
+        '<button type="button" class="button" id="chat-reply-send-button">送信</button>' +
+        '</div>';
+
+      var messagesContainer = document.getElementById('reply-chat-messages');
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+      document.getElementById('chat-ai-suggest-button').addEventListener('click', function () {
+        if (!latestThreadId) {
+          showToast('返信対象のスレッドが見つかりませんでした。', 'info');
+          return;
+        }
+        var btn = document.getElementById('chat-ai-suggest-button');
+        btn.disabled = true;
+        btn.classList.add('button--loading');
+        google.script.run
+          .withSuccessHandler(function (draft) {
+            btn.disabled = false;
+            btn.classList.remove('button--loading');
+            document.getElementById('chat-reply-textarea').value = draft || '';
+          })
+          .withFailureHandler(function (error) {
+            btn.disabled = false;
+            btn.classList.remove('button--loading');
+            showToast('AI返信案の生成に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .generateReplyDraft(latestThreadId);
+      });
+
+      document.getElementById('chat-reply-send-button').addEventListener('click', function () {
+        if (!latestThreadId) {
+          showToast('返信対象のスレッドが見つかりませんでした。', 'info');
+          return;
+        }
+        var textarea = document.getElementById('chat-reply-textarea');
+        var body = textarea.value;
+        if (!body) {
+          showToast('返信内容を入力してください', 'info');
+          return;
+        }
+        var confirmed = window.confirm(
+          '━━━━━━━━━━━━━━\n' +
+          '返信を送信します。\n\n' +
+          '送信後は取り消せません。\n\n' +
+          '送信しますか？\n' +
+          '━━━━━━━━━━━━━━'
+        );
+        if (!confirmed) {
+          return;
+        }
+
+        var sendBtn = document.getElementById('chat-reply-send-button');
+        sendBtn.disabled = true;
+        sendBtn.classList.add('button--loading');
+        var toast = showToast('返信を送信しています…', 'loading', { persist: true });
+
+        google.script.run
+          .withSuccessHandler(function () {
+            toast.update('返信を送信しました。', 'success');
+            loadChatThread(companyId);
+          })
+          .withFailureHandler(function (error) {
+            sendBtn.disabled = false;
+            sendBtn.classList.remove('button--loading');
+            toast.update('返信送信に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          })
+          .replyInboxMessage(latestThreadId, body);
+      });
+    }
   })();
 </script>

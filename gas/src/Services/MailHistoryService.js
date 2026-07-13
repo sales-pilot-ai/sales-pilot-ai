@@ -27,6 +27,10 @@ function listCompanyMailHistory_(companyId) {
 
   return threads.map(function (thread) {
     return {
+      // threadId: Sprint8の返信確認「継続返信」チャットUIで、このスレッドへ返信する際に使う
+      // （replyInboxMessage_の引数）。既存のメール履歴モーダル（CompanyList.html）は
+      // この項目を参照しないため、追加しても表示への影響はない。
+      threadId: thread.getId(),
       subject: thread.getFirstMessageSubject(),
       messages: thread.getMessages().map(function (message) {
         return {

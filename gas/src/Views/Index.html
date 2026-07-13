@@ -18,27 +18,62 @@
   <body>
     <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-    <header class="app-header">
-      <div class="app-header__brand"><span aria-hidden="true">📊</span> Sales Pilot AI</div>
-      <nav class="app-nav" id="app-nav">
-        <a class="app-nav__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard">ホーム</a>
-        <a class="app-nav__link<?= page === 'search' ? ' is-active' : '' ?>" href="#" data-page="search">企業検索</a>
-        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList">営業リスト</a>
-        <a class="app-nav__link<?= page === 'inbox' ? ' is-active' : '' ?>" href="#" data-page="inbox">受信トレイ</a>
-        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList" title="営業リスト画面の一括送信から実行できます">一括送信</a>
-        <a class="app-nav__link<?= page === 'templates' ? ' is-active' : '' ?>" href="#" data-page="templates">テンプレート</a>
-        <a class="app-nav__link<?= page === 'companyList' ? ' is-active' : '' ?>" href="#" data-page="companyList" title="営業リスト画面の返信確認から実行できます">返信確認</a>
-        <a class="app-nav__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard" title="Dashboard画面の本日フォローすべき企業から確認できます">フォローアップ</a>
-        <a class="app-nav__link<?= page === 'report' ? ' is-active' : '' ?>" href="#" data-page="report">レポート</a>
-        <a class="app-nav__link<?= page === 'settings' ? ' is-active' : '' ?>" href="#" data-page="settings">設定</a>
-      </nav>
-      <div class="app-header__user" id="current-user">読み込み中…</div>
-      <button class="app-header__menu-toggle" id="menu-toggle" aria-label="メニュー">☰</button>
-    </header>
+    <? if (!user) { ?>
+      <div class="permission-screen">
+        <h1>権限が設定されていません</h1>
+        <p>このアプリを利用するには管理者による利用登録が必要です。管理者にご連絡ください。</p>
+      </div>
+    <? } else if (accessDenied) { ?>
+      <div class="permission-screen">
+        <h1>アクセス権限がありません</h1>
+        <p>この画面はAdmin権限を持つユーザーのみ利用できます。</p>
+        <a class="button" href="#" data-page="dashboard">ホームへ戻る</a>
+      </div>
+    <? } else { ?>
+      <div class="app-shell">
+        <aside class="app-sidebar">
+          <div class="app-sidebar__brand"><span aria-hidden="true">📊</span> Sales Pilot AI</div>
+          <button class="app-sidebar__menu-toggle" id="menu-toggle" aria-label="メニュー">☰</button>
 
-    <main class="app-main">
-      <?!= include(pageTemplate); ?>
-    </main>
+          <nav class="app-sidebar__nav" id="app-nav">
+            <a class="app-sidebar__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard">
+              <span aria-hidden="true">📊</span> Dashboard
+            </a>
+            <a class="app-sidebar__link<?= (page === 'companyList' || page === 'search' || page === 'inbox') ? ' is-active' : '' ?>" href="#" data-page="companyList">
+              <span aria-hidden="true">📇</span> 営業管理
+            </a>
+            <? if (user.role === 'Admin') { ?>
+              <a class="app-sidebar__link<?= page === 'templates' ? ' is-active' : '' ?>" href="#" data-page="templates">
+                <span aria-hidden="true">📄</span> テンプレート
+              </a>
+            <? } ?>
+            <a class="app-sidebar__link<?= page === 'dashboard' ? ' is-active' : '' ?>" href="#" data-page="dashboard" title="Dashboard画面の本日フォローすべき企業から確認できます">
+              <span aria-hidden="true">📅</span> フォローアップ
+            </a>
+            <a class="app-sidebar__link<?= page === 'report' ? ' is-active' : '' ?>" href="#" data-page="report">
+              <span aria-hidden="true">📈</span> レポート
+            </a>
+            <? if (user.role === 'Admin') { ?>
+              <a class="app-sidebar__link<?= page === 'settings' ? ' is-active' : '' ?>" href="#" data-page="settings">
+                <span aria-hidden="true">⚙️</span> 設定
+              </a>
+            <? } ?>
+          </nav>
+
+          <div class="app-sidebar__divider"></div>
+          <div class="app-sidebar__user">
+            <span aria-hidden="true">👤</span> <?= user.name ?>
+          </div>
+          <button type="button" class="app-sidebar__link app-sidebar__logout" id="logout-button">
+            <span aria-hidden="true">🚪</span> ログアウト
+          </button>
+        </aside>
+
+        <main class="app-main">
+          <?!= include(pageTemplate); ?>
+        </main>
+      </div>
+    <? } ?>
 
     <script>
       // 通知UI（Sprint6③）。alert()の代わりに使う共通トースト。成功/エラー/情報/処理中の
@@ -94,9 +129,12 @@
       }
       window.showToast = showToast;
 
-      document.getElementById('menu-toggle').addEventListener('click', function () {
-        document.getElementById('app-nav').classList.toggle('is-open');
-      });
+      var menuToggle = document.getElementById('menu-toggle');
+      if (menuToggle) {
+        menuToggle.addEventListener('click', function () {
+          document.getElementById('app-nav').classList.toggle('is-open');
+        });
+      }
 
       // data-page属性を持つリンクはすべてこのハンドラーで absolute URL 遷移する
       // （Dashboard.html / CompanyList.html 等、includeされた画面内のリンクも対象）。
@@ -109,16 +147,23 @@
         navigateToPage(link.getAttribute('data-page'));
       });
 
-      google.script.run
-        .withSuccessHandler(function (user) {
-          var el = document.getElementById('current-user');
-          el.textContent = user && user.email ? user.email : 'ログイン情報を取得できませんでした';
-        })
-        .withFailureHandler(function (error) {
-          document.getElementById('current-user').textContent = 'ログイン情報の取得に失敗しました';
-          console.error(error);
-        })
-        .getCurrentUser();
+      // ログアウト（Sprint8①）。アプリ側では独自のセッション・トークン管理を持たず、
+      // Googleアカウント自体のログアウトページへ遷移させるだけに留める。
+      var logoutButton = document.getElementById('logout-button');
+      if (logoutButton) {
+        logoutButton.addEventListener('click', function () {
+          var confirmed = window.confirm(
+            '━━━━━━━━━━━━━━━━━━\n' +
+            'Googleアカウント全体からログアウトします。\n\n' +
+            'ログアウトしますか？\n' +
+            '━━━━━━━━━━━━━━━━━━'
+          );
+          if (!confirmed) {
+            return;
+          }
+          window.open('https://accounts.google.com/Logout', '_top');
+        });
+      }
     </script>
   </body>
 </html>

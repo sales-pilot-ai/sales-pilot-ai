@@ -40,7 +40,51 @@
 
     <button type="submit" class="button" id="settings-save-button">保存</button>
   </form>
+
+  <!-- ユーザー管理（Sprint8⑤、Admin専用）。設定フォームとは独立した一覧＋都度保存の
+       操作のため、上記フォームには含めず別セクションにする。 -->
+  <div class="settings__section">
+    <div class="templates__section-header">
+      <h2>ユーザー管理</h2>
+      <button type="button" class="button" id="user-create-button">新規ユーザー追加</button>
+    </div>
+    <p id="user-list-loading" class="empty-state">読み込み中…</p>
+    <p id="user-list-error" class="error-message" hidden></p>
+    <table class="company-table" id="user-table" hidden>
+      <thead>
+        <tr>
+          <th>名前</th>
+          <th>メールアドレス</th>
+          <th>権限</th>
+          <th>作成日時</th>
+          <th>最終ログイン日時</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody id="user-table-body"></tbody>
+    </table>
+  </div>
 </section>
+
+<div class="modal-overlay" id="user-create-modal" hidden>
+  <div class="modal">
+    <button type="button" class="modal__close" id="user-create-modal-close" aria-label="閉じる">×</button>
+    <h2>新規ユーザー追加</h2>
+    <label>名前</label>
+    <input type="text" id="user-create-name" />
+    <label>メールアドレス</label>
+    <input type="email" id="user-create-email" />
+    <label>権限</label>
+    <select id="user-create-role">
+      <option value="User">User</option>
+      <option value="Admin">Admin</option>
+    </select>
+    <div class="company-list__bulk-actions">
+      <button type="button" class="button button--secondary" id="user-create-cancel-button">キャンセル</button>
+      <button type="button" class="button" id="user-create-save-button">追加</button>
+    </div>
+  </div>
+</div>
 
 <script>
   (function () {
@@ -136,5 +180,205 @@
     });
 
     loadSettings();
+
+    // ===== ユーザー管理（Sprint8⑤、Admin専用） =====
+
+    var users = [];
+    var currentUserEmail = null;
+    var userListLoadingEl = document.getElementById('user-list-loading');
+    var userListErrorEl = document.getElementById('user-list-error');
+    var userTableEl = document.getElementById('user-table');
+    var userTbody = document.getElementById('user-table-body');
+    var userCreateModal = document.getElementById('user-create-modal');
+    var userCreateNameInput = document.getElementById('user-create-name');
+    var userCreateEmailInput = document.getElementById('user-create-email');
+    var userCreateRoleSelect = document.getElementById('user-create-role');
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
+
+    function loadUsers() {
+      userListLoadingEl.hidden = false;
+      userListErrorEl.hidden = true;
+      userTableEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          currentUserEmail = result && result.email ? result.email : null;
+          loadUserList();
+        })
+        .withFailureHandler(function () {
+          currentUserEmail = null;
+          loadUserList();
+        })
+        .getCurrentUser();
+    }
+
+    function loadUserList() {
+      google.script.run
+        .withSuccessHandler(function (result) {
+          userListLoadingEl.hidden = true;
+          userTableEl.hidden = false;
+          users = result || [];
+          renderUserTable();
+        })
+        .withFailureHandler(function (error) {
+          userListLoadingEl.hidden = true;
+          userListErrorEl.hidden = false;
+          userListErrorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .listUsers();
+    }
+
+    function isSelf(email) {
+      return currentUserEmail && String(email).trim().toLowerCase() === String(currentUserEmail).trim().toLowerCase();
+    }
+
+    // Adminが1人だけの場合、その1人の権限変更・削除をボタン段階で防ぐ（サーバー側の
+    // updateUserRole_/deleteUser_のガードと同じ条件をUI側でも反映し、無効な操作を
+    // 事前に減らす。最終的な強制力はサーバー側にある）。
+    function isLastAdmin(user) {
+      if (user.role !== 'Admin') {
+        return false;
+      }
+      return users.filter(function (u) {
+        return u.role === 'Admin';
+      }).length <= 1;
+    }
+
+    function renderUserTable() {
+      userTbody.innerHTML = users
+        .map(function (u) {
+          var lastAdmin = isLastAdmin(u);
+          var self = isSelf(u.email);
+          var roleOptions = ['User', 'Admin']
+            .map(function (r) {
+              return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>';
+            })
+            .join('');
+          return (
+            '<tr data-email="' + escapeHtml(u.email) + '">' +
+            '<td>' + escapeHtml(u.name) + '</td>' +
+            '<td>' + escapeHtml(u.email) + '</td>' +
+            '<td><select class="user-role-select" data-email="' + escapeHtml(u.email) + '"' + (lastAdmin ? ' disabled title="最後の1人のAdminは変更できません"' : '') + '>' + roleOptions + '</select></td>' +
+            '<td>' + escapeHtml(u.createdAt) + '</td>' +
+            '<td>' + escapeHtml(u.lastLoginAt) + '</td>' +
+            '<td>' +
+            '<button type="button" class="button button--secondary" data-action="delete" data-email="' + escapeHtml(u.email) + '"' +
+            (self || lastAdmin ? ' disabled title="' + (self ? '自分自身は削除できません' : '最後の1人のAdminは削除できません') + '"' : '') +
+            '>削除</button>' +
+            '</td>' +
+            '</tr>'
+          );
+        })
+        .join('');
+    }
+
+    document.getElementById('user-create-button').addEventListener('click', function () {
+      userCreateNameInput.value = '';
+      userCreateEmailInput.value = '';
+      userCreateRoleSelect.value = 'User';
+      userCreateModal.hidden = false;
+    });
+
+    document.getElementById('user-create-modal-close').addEventListener('click', function () {
+      userCreateModal.hidden = true;
+    });
+    document.getElementById('user-create-cancel-button').addEventListener('click', function () {
+      userCreateModal.hidden = true;
+    });
+    userCreateModal.addEventListener('click', function (event) {
+      if (event.target === userCreateModal) {
+        userCreateModal.hidden = true;
+      }
+    });
+
+    document.getElementById('user-create-save-button').addEventListener('click', function () {
+      var data = {
+        name: userCreateNameInput.value,
+        email: userCreateEmailInput.value,
+        role: userCreateRoleSelect.value,
+      };
+      if (!data.name || !data.email) {
+        showToast('名前・メールアドレスを入力してください。', 'info');
+        return;
+      }
+
+      var saveButton = document.getElementById('user-create-save-button');
+      saveButton.disabled = true;
+      saveButton.classList.add('button--loading');
+      var toast = showToast('追加しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          toast.update('ユーザーを追加しました。', 'success');
+          userCreateModal.hidden = true;
+          loadUserList();
+        })
+        .withFailureHandler(function (error) {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          toast.update('追加に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .createUser(data);
+    });
+
+    userTbody.addEventListener('change', function (event) {
+      var select = event.target.closest('.user-role-select');
+      if (!select) {
+        return;
+      }
+      var email = select.getAttribute('data-email');
+      var newRole = select.value;
+      select.disabled = true;
+      var toast = showToast('権限を変更しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          toast.update('権限を変更しました。', 'success');
+          loadUserList();
+        })
+        .withFailureHandler(function (error) {
+          select.disabled = false;
+          toast.update('権限変更に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+          loadUserList();
+        })
+        .updateUserRole(email, newRole);
+    });
+
+    userTbody.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-action="delete"]');
+      if (!button) {
+        return;
+      }
+      var email = button.getAttribute('data-email');
+      var confirmed = window.confirm('本当に削除しますか？\n\n' + email);
+      if (!confirmed) {
+        return;
+      }
+
+      button.disabled = true;
+      button.classList.add('button--loading');
+      var toast = showToast('削除しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          toast.update('削除しました。', 'success');
+          loadUserList();
+        })
+        .withFailureHandler(function (error) {
+          button.disabled = false;
+          button.classList.remove('button--loading');
+          toast.update('削除に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .deleteUser(email);
+    });
+
+    loadUsers();
   })();
 </script>

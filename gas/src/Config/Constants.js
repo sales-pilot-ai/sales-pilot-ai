@@ -30,12 +30,18 @@ var SEND_APPROVAL = {
   NO: '×',
 };
 
+// IN_PROGRESS（対応中）・ON_HOLD（保留）はSprint8で追加。既存の「送信状況」列
+// （updateCompanyStatus_で任意の値に更新できる汎用ステータス列）をそのまま流用し、
+// 新しい列・新しい更新ロジックは追加しない。IN_PROGRESSは返信確認「新着返信」で
+// 「対応済みにする」ボタンを押した際に設定し、以後は「継続返信」タブの対象になる。
 var SEND_STATUS = {
   NOT_SENT: '未送信',
   SENT: '送信済',
   FAILED: '送信失敗',
   REPLIED: '返信あり',
   UNSUBSCRIBED: '配信停止',
+  IN_PROGRESS: '対応中',
+  ON_HOLD: '保留',
 };
 
 var DEAL_RESULT = {

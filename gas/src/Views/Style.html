@@ -25,15 +25,23 @@
     line-height: 1.6;
   }
 
-  .app-header {
+  /* 共通レイアウト（左サイドバー、Sprint8③）。 */
+  .app-shell {
     display: flex;
-    align-items: center;
-    gap: 24px;
-    padding: 16px 24px;
-    border-bottom: 1px solid var(--color-border);
+    align-items: stretch;
+    min-height: 100vh;
   }
 
-  .app-header__brand {
+  .app-sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 240px;
+    flex-shrink: 0;
+    padding: 20px 16px;
+    border-right: 1px solid var(--color-border);
+  }
+
+  .app-sidebar__brand {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -41,57 +49,100 @@
     font-weight: 700;
     color: var(--color-accent);
     white-space: nowrap;
+    padding: 0 12px;
   }
 
-  .app-header__menu-toggle {
+  .app-sidebar__menu-toggle {
     display: none;
     background: none;
     border: none;
     font-size: 20px;
     cursor: pointer;
-    margin-left: auto;
+    align-self: flex-end;
   }
 
-  .app-nav {
+  .app-sidebar__nav {
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 24px;
     flex: 1;
   }
 
-  .app-nav__link {
+  .app-sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 6px;
     text-decoration: none;
     color: var(--color-text);
     cursor: pointer;
-    padding-bottom: 2px;
-    border-bottom: 2px solid transparent;
-    transition: color 0.15s ease, border-color 0.15s ease;
+    font-size: 14px;
+    font-family: inherit;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
-  .app-nav__link:hover {
+  .app-sidebar__link:hover {
+    background: var(--color-surface-muted);
     color: var(--color-accent);
   }
 
-  .app-nav__link.is-active {
+  .app-sidebar__link.is-active {
+    background: var(--color-surface-muted);
     color: var(--color-accent);
     font-weight: 700;
-    border-bottom-color: var(--color-accent);
   }
 
-  .app-nav__link.is-disabled {
-    color: var(--color-disabled);
-    cursor: default;
+  .app-sidebar__divider {
+    border-top: 1px solid var(--color-border);
+    margin: 16px 0;
   }
 
-  .app-header__user {
+  .app-sidebar__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
     color: var(--color-text-muted);
+    font-size: 13px;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .app-sidebar__logout {
+    color: var(--color-error);
+  }
+
+  .app-sidebar__logout:hover {
+    background: var(--color-surface-muted);
+    color: var(--color-error);
   }
 
   .app-main {
+    flex: 1;
     padding: 32px 24px;
-    max-width: 960px;
-    margin: 0 auto;
+    min-width: 0;
+  }
+
+  .permission-screen {
+    max-width: 480px;
+    margin: 15vh auto 0;
+    padding: 32px;
+    text-align: center;
+  }
+
+  .permission-screen h1 {
+    font-size: 20px;
+  }
+
+  .permission-screen p {
+    color: var(--color-text-muted);
   }
 
   .dashboard__cards {
@@ -398,6 +449,233 @@
     transition: width 0.2s ease;
   }
 
+  /* 営業管理タブ（Sprint8④）。Dashboard/Settings/Reportと同じボタン・カード・配色の
+     語彙をそのまま使い、新しいUIパターンは追加しない。 */
+  .sales-tabs,
+  .sales-subtabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .sales-tabs__tab,
+  .sales-subtabs__tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
+
+  .sales-tabs__tab.is-active,
+  .sales-subtabs__tab.is-active {
+    color: var(--color-accent);
+    font-weight: 700;
+    border-bottom-color: var(--color-accent);
+  }
+
+  .sales-tabs__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--color-error);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .sales-send__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .reply-new-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .reply-card {
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .reply-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .reply-card__company {
+    font-weight: 700;
+  }
+
+  .reply-card__owner {
+    color: var(--color-text-muted);
+    font-size: 12px;
+  }
+
+  .reply-card__snippet {
+    color: var(--color-text-muted);
+    margin-bottom: 12px;
+  }
+
+  .reply-card__ai {
+    background: var(--color-surface-muted);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    white-space: pre-wrap;
+  }
+
+  .reply-card__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .reply-chat {
+    display: flex;
+    gap: 16px;
+    min-height: 480px;
+  }
+
+  .reply-chat__list {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--color-border);
+    padding-right: 16px;
+  }
+
+  .reply-chat__company-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .reply-chat__company-button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    font-family: inherit;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .reply-chat__company-button:hover,
+  .reply-chat__company-button.is-active {
+    background: var(--color-surface-muted);
+  }
+
+  .reply-chat__company-name {
+    font-weight: 700;
+  }
+
+  .reply-chat__company-owner {
+    color: var(--color-text-muted);
+    font-size: 12px;
+  }
+
+  .reply-chat__thread {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .reply-chat__messages {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 360px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .reply-chat__message {
+    display: flex;
+    flex-direction: column;
+    max-width: 70%;
+  }
+
+  .reply-chat__message--sent {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+
+  .reply-chat__message--received {
+    align-self: flex-start;
+    align-items: flex-start;
+  }
+
+  .reply-chat__bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .reply-chat__message--sent .reply-chat__bubble {
+    background: var(--color-accent);
+    color: #fff;
+  }
+
+  .reply-chat__message--received .reply-chat__bubble {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+  }
+
+  .reply-chat__meta {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+
+  .reply-chat__attachment-placeholder {
+    color: var(--color-disabled);
+    font-size: 12px;
+    padding: 8px 0;
+    border-top: 1px dashed var(--color-border);
+    margin-top: 8px;
+  }
+
+  .reply-chat__composer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .reply-chat__composer textarea {
+    width: 100%;
+    font-family: inherit;
+  }
+
   .company-list__status-undo-bar {
     display: flex;
     align-items: center;
@@ -690,25 +968,47 @@
       width: auto;
     }
 
-    .app-header__menu-toggle {
-      display: block;
+    .app-shell {
+      flex-direction: column;
     }
 
-    .app-nav {
+    .app-sidebar {
+      width: auto;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      border-right: none;
+      border-bottom: 1px solid var(--color-border);
+      padding: 12px 16px;
+    }
+
+    .app-sidebar__menu-toggle {
+      display: block;
+      margin-left: auto;
+    }
+
+    .app-sidebar__nav {
       display: none;
       flex-direction: column;
       width: 100%;
       order: 3;
-      padding-top: 12px;
+      margin-top: 12px;
     }
 
-    .app-nav.is-open {
+    .app-sidebar__nav.is-open {
       display: flex;
     }
 
-    .app-header__user {
-      order: 2;
-      margin-left: auto;
+    .app-sidebar__divider,
+    .app-sidebar__user,
+    .app-sidebar__logout {
+      display: none;
+    }
+
+    .app-sidebar__nav.is-open ~ .app-sidebar__divider,
+    .app-sidebar__nav.is-open ~ .app-sidebar__user,
+    .app-sidebar__nav.is-open ~ .app-sidebar__logout {
+      display: flex;
     }
 
     .dashboard__cards {

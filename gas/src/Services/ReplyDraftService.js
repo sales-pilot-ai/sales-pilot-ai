@@ -26,3 +26,20 @@ function generateReplyDraft_(threadId) {
   var prompt = buildReplyDraftPrompt_(detail.subject, detail.plainBody);
   return callGemini_(prompt);
 }
+
+// 返信確認「新着返信（初回）」一覧のAI要約（Sprint8④-3）。受信メール本文を1文程度に
+// 要約するだけの単純なプロンプトで、新しいGemini呼び出しの仕組みは作らずcallGemini_を
+// そのまま再利用する（generateReplyDraft_と同じ構成）。
+function buildReplySummaryPrompt_(plainBody) {
+  return [
+    '以下はある企業からの返信メールの本文です。営業担当が一覧画面で内容を素早く把握できるよう、',
+    '1文（40文字程度）で日本語要約してください。要約文のみを返してください。',
+    '',
+    '本文:',
+    plainBody || '(本文なし)',
+  ].join('\n');
+}
+
+function summarizeCompanyReply_(plainBody) {
+  return callGemini_(buildReplySummaryPrompt_(plainBody));
+}
