@@ -396,6 +396,14 @@
     flex: 1;
   }
 
+  /* ヘッダーが列幅不足で1文字ずつ縦に折り返されるのを防ぐため、テーブルを
+     .company-table__scroll でラップし、幅が収まらない場合は横スクロールさせる
+     （デスクトップ幅でも常時有効。モバイル向けの折り返し防止は既存の
+     @media (max-width: 768px) 内の.company-tableルールがそのまま担当する）。 */
+  .company-table__scroll {
+    overflow-x: auto;
+  }
+
   .company-table {
     width: 100%;
     border-collapse: collapse;
@@ -412,6 +420,13 @@
   .company-table th {
     color: var(--color-text-muted);
     font-weight: 700;
+    white-space: nowrap;
+  }
+
+  /* 会社名列（チェックボックス列の次）は、他の見出しをnowrap化した際に
+     詰まりすぎて読みにくくならないよう最小幅を確保する。 */
+  .company-table th:nth-child(2) {
+    min-width: 140px;
   }
 
   .company-list__pagination {

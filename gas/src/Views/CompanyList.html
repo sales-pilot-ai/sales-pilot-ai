@@ -71,28 +71,30 @@
   <p id="list-error" class="error-message" hidden></p>
   <p id="list-empty" class="empty-state" hidden>該当する企業がありません。</p>
 
-  <table class="company-table" id="company-table" hidden>
-    <thead>
-      <tr>
-        <th><input type="checkbox" id="select-all-checkbox" aria-label="全選択" /></th>
-        <th>会社名</th>
-        <th>担当者</th>
-        <th>メールアドレス</th>
-        <th>業種</th>
-        <th>エリア</th>
-        <th>送信状況</th>
-        <th>返信有無</th>
-        <th>現在ステータス</th>
-        <th>商談日</th>
-        <th>成約</th>
-        <th>最終更新</th>
-        <th>詳細</th>
-        <th>AI要約</th>
-        <th>AI操作</th>
-      </tr>
-    </thead>
-    <tbody id="company-table-body"></tbody>
-  </table>
+  <div class="company-table__scroll">
+    <table class="company-table" id="company-table" hidden>
+      <thead>
+        <tr>
+          <th><input type="checkbox" id="select-all-checkbox" aria-label="全選択" /></th>
+          <th>会社名</th>
+          <th>担当者</th>
+          <th title="メールアドレス">メール</th>
+          <th>業種</th>
+          <th>エリア</th>
+          <th title="送信状況">送信</th>
+          <th title="返信有無">返信</th>
+          <th title="現在ステータス">ステータス</th>
+          <th>商談日</th>
+          <th>成約</th>
+          <th>最終更新</th>
+          <th>詳細</th>
+          <th>AI要約</th>
+          <th>AI操作</th>
+        </tr>
+      </thead>
+      <tbody id="company-table-body"></tbody>
+    </table>
+  </div>
 
   <div class="company-list__pagination" id="pagination" hidden></div>
 
