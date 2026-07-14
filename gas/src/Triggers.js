@@ -26,3 +26,43 @@ function removeReplySyncTrigger_() {
 function scheduledReplySync_() {
   syncReplyStatus_();
 }
+
+// タスクC「返信有無」空欄一括補完の手動実行用ラッパー。
+// backfillMissingHasReply_（末尾アンダースコア付き）はApps Scriptエディタの実行欄の
+// ドロップダウンに表示されないため、アンダースコアなしのこの関数をエディタから
+// 一度だけ手動実行する。
+function runBackfillMissingHasReply() {
+  var result = backfillMissingHasReply_();
+  Logger.log('runBackfillMissingHasReply: updatedCount=' + result.updatedCount);
+}
+
+// 権限シートの秘匿化（タスクD代替案①・採用済み）。共有スプレッドシートを他メンバーと
+// 共有しても、「権限」シートだけは非表示にする。
+//
+// 重要な制約: Webアプリの実行モードはUSER_ACCESSING（Code.js/appsscript.json参照）のため、
+// シート保護（Protection）で編集可能ユーザーをオーナーのみに制限すると、Apps Scriptからの
+// 書き込みも「アクセスしている本人自身の権限」で実行される。PermissionService.jsの
+// getCurrentUserContext_()は、Admin・User問わずログインのたびに「最終ログイン日時」列へ
+// 書き込みを行うため、オーナー以外の全ユーザーがログインするたびにこの書き込みが
+// 「保護されたセルを編集する権限がありません」という例外で失敗し、オーナー以外の
+// 全員がログインできなくなる（オーナー以外のAdminによるユーザー追加・削除・権限変更も
+// 同様に失敗する）。この影響は「既存機能を壊さないこと」という制約に反するため、
+// 本関数では編集制限（protect）は行わず、非表示（hideSheet）のみを行う。
+function setupProtectPermissionSheet() {
+  var spreadsheet = SpreadsheetApp.openById(getSpreadsheetId_());
+
+  var sheet = spreadsheet.getSheetByName(PERMISSION_SHEET_NAME);
+  if (sheet) {
+    sheet.hideSheet();
+  }
+
+  var oldSheet = spreadsheet.getSheetByName(PERMISSION_SHEET_NAME + '_旧');
+  if (oldSheet) {
+    oldSheet.hideSheet();
+  }
+
+  Logger.log(
+    'setupProtectPermissionSheet: 「権限」シート（および「権限_旧」があれば同様に）を非表示にしました。' +
+      'USER_ACCESSING実行モードのため、編集制限（シート保護）は実施していません（コード内コメント参照）。'
+  );
+}
