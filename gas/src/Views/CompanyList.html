@@ -333,6 +333,30 @@
       return companies;
     }
 
+    // 送信状況セルの表示（追加依頼: 色分け）。シート上の値（c.sendStatus）は一切変更せず、
+    // 表示用のラベル・文字色のみを変える。「未送信」「送信済」以外の値（空欄含む）は
+    // 従来どおりの表示のまま。
+    function renderSendStatusCell(c) {
+      if (c.sendStatus === '未送信') {
+        return '<span class="status-text--danger">未送信</span>';
+      }
+      if (c.sendStatus === '送信済') {
+        return '<span class="status-text--info">送信済み</span>';
+      }
+      return escapeHtml(c.sendStatus);
+    }
+
+    // 返信有無セルの表示（追加依頼: 色分け）。シート上の値（c.hasReply）は変更しない。
+    function renderHasReplyCell(c) {
+      if (c.hasReply === '未返信') {
+        return '<span class="status-text--danger">未返信</span>';
+      }
+      if (c.hasReply === '返信あり') {
+        return '<span class="status-text--info">返信あり</span>';
+      }
+      return escapeHtml(c.hasReply);
+    }
+
     // 営業リストタブの「現在ステータス」列（Sprint8④-1）。既存の送信状況・返信有無・商談日・
     // 成約の各フィールドから表示用ラベルを計算するだけで、新しい列・書き込み処理は追加しない。
     function computeCurrentStatusLabel(c) {
@@ -442,8 +466,8 @@
             '<td>' + escapeHtml(c.email) + '</td>' +
             '<td>' + escapeHtml(c.industry) + '</td>' +
             '<td>' + escapeHtml(c.area) + '</td>' +
-            '<td>' + escapeHtml(c.sendStatus) + '</td>' +
-            '<td>' + escapeHtml(c.hasReply) + '</td>' +
+            '<td>' + renderSendStatusCell(c) + '</td>' +
+            '<td>' + renderHasReplyCell(c) + '</td>' +
             '<td>' + escapeHtml(computeCurrentStatusLabel(c)) + '</td>' +
             '<td>' + escapeHtml(c.meetingDate) + '</td>' +
             '<td>' + escapeHtml(c.dealResult) + '</td>' +

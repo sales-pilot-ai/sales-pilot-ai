@@ -863,6 +863,17 @@
     margin-top: -6px;
   }
 
+  /* 営業リストタブの送信状況・返信有無セルの色分け（追加依頼）。
+     文字色のみ変更し、背景・レイアウトは変えない。既存の赤(エラー系)・
+     青(プライマリ系)のトークンをそのまま流用する。 */
+  .status-text--danger {
+    color: var(--color-error);
+  }
+
+  .status-text--info {
+    color: var(--color-accent);
+  }
+
   .modal-overlay {
     position: fixed;
     top: 0;
