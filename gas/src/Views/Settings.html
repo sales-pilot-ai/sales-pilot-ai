@@ -261,7 +261,7 @@
             .join('');
           return (
             '<tr data-email="' + escapeHtml(u.email) + '">' +
-            '<td>' + escapeHtml(u.name) + '</td>' +
+            '<td><input type="text" class="user-name-input" data-email="' + escapeHtml(u.email) + '" value="' + escapeHtml(u.name) + '" aria-label="名前" /></td>' +
             '<td>' + escapeHtml(u.email) + '</td>' +
             '<td><select class="user-role-select" data-email="' + escapeHtml(u.email) + '"' + (lastAdmin ? ' disabled title="最後の1人のAdminは変更できません"' : '') + '>' + roleOptions + '</select></td>' +
             '<td>' + escapeHtml(u.createdAt) + '</td>' +
@@ -349,6 +349,64 @@
           loadUserList();
         })
         .updateUserRole(email, newRole);
+    });
+
+    // 名前の編集（追加依頼）。名前セルは常時入力可能なテキスト欄で、値を変えてフォーカスを
+    // 外す（blur）と保存する。自分自身の名前も変更可能（権限変更・削除にある「自分自身は
+    // 不可」の保護は適用しない）。メールアドレス・権限・作成日時・最終ログイン日時には
+    // 影響しない。
+    function handleUserNameChange(input) {
+      var email = input.getAttribute('data-email');
+      var newName = input.value.trim();
+      var user = users.filter(function (u) {
+        return u.email === email;
+      })[0];
+      var previousName = user ? user.name : '';
+
+      if (!newName) {
+        showToast('名前を入力してください。', 'info');
+        input.value = previousName;
+        return;
+      }
+      if (newName === previousName) {
+        return;
+      }
+
+      input.disabled = true;
+      var toast = showToast('名前を変更しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function () {
+          toast.update('名前を変更しました。', 'success');
+          loadUserList();
+        })
+        .withFailureHandler(function (error) {
+          input.disabled = false;
+          input.value = previousName;
+          toast.update('名前の変更に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .updateUserName(email, newName);
+    }
+
+    userTbody.addEventListener('change', function (event) {
+      var nameInput = event.target.closest('.user-name-input');
+      if (!nameInput) {
+        return;
+      }
+      handleUserNameChange(nameInput);
+    });
+
+    // Enterキーでも確定できるよう、blur()を呼んでchangeイベントを発火させる。
+    userTbody.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') {
+        return;
+      }
+      var nameInput = event.target.closest('.user-name-input');
+      if (!nameInput) {
+        return;
+      }
+      event.preventDefault();
+      nameInput.blur();
     });
 
     userTbody.addEventListener('click', function (event) {

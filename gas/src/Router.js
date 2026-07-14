@@ -259,6 +259,13 @@ function updateUserRole(email, role) {
   return updateUserRole_(email, role);
 }
 
+// ユーザー管理: 名前の編集（追加依頼）。bootstrap登録時の初期名（メールアドレスの@より前）が
+// 実際の名前と異なる場合に手動で修正できるようにする。
+function updateUserName(email, name) {
+  requireAdmin_();
+  return updateUserName_(email, name);
+}
+
 function deleteUser(email) {
   var currentUser = requireAdmin_();
   return deleteUser_(email, currentUser.email);

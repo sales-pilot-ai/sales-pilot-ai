@@ -184,6 +184,29 @@ function createUser_(data) {
   }
 }
 
+// 名前変更。メールアドレス・権限・作成日時・最終ログイン日時には影響しない。権限変更・削除に
+// ある「自分自身は不可」の保護は名前の変更には適用しない（自分自身の名前も変更できる）。
+function updateUserName_(email, name) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var trimmedName = String(name || '').trim();
+    if (!trimmedName) {
+      throw new Error('名前を入力してください。');
+    }
+    var sheet = getPermissionSheet_();
+    var rowIndex = findUserRowIndexByEmail_(sheet, email);
+    if (rowIndex === -1) {
+      throw new Error('ユーザーが見つかりません（' + email + '）。');
+    }
+    var headerIndex = buildPermissionHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+    sheet.getRange(rowIndex, headerIndex['名前'] + 1).setValue(trimmedName);
+    return findUserByEmail_(email);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // role変更。Adminが最後の1人の場合、その1人をUserへ変更することは禁止する。
 function updateUserRole_(email, role) {
   var lock = LockService.getScriptLock();

@@ -102,6 +102,7 @@ const gasProjectGlobals = {
   updateReplyTemplate_: 'readonly',
   updateSalesTemplate_: 'readonly',
   updateSettings_: 'readonly',
+  updateUserName_: 'readonly',
   updateUserRole_: 'readonly',
   upsertCompanyAnalysisFields_: 'readonly',
   upsertCompanyCandidate_: 'readonly',
