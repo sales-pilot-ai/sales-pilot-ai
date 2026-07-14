@@ -325,13 +325,12 @@
       return d.getFullYear() + '-' + mm + '-' + dd;
     }
 
-    // 営業管理「営業リスト」タブ（Sprint8④-1）は、初回メール送信済みの企業のみを対象とする
-    // （未送信の企業は「一括送信」タブの対象）。読み取り専用のクライアント側フィルタで、
-    // サーバー側のlistCompaniesFromSheet_は変更しない。
+    // 営業管理「営業リスト」タブは、シート上の全企業を送信状況によらず表示する
+    // （2026-07-14: 未送信企業がタブから消えて見える不具合報告を受け、Sprint8④-1で
+    // 導入していた「送信済のみ表示」条件を撤廃した。未送信企業向けの「一括送信」タブは
+    // 従来どおり別の絞り込み条件（loadSendTab参照）で対象を選ぶため、本変更による影響はない）。
     function applyTabBaseFilter(companies) {
-      return companies.filter(function (c) {
-        return c.sendStatus !== '未送信';
-      });
+      return companies;
     }
 
     // 営業リストタブの「現在ステータス」列（Sprint8④-1）。既存の送信状況・返信有無・商談日・

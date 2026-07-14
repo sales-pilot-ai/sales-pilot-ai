@@ -45,9 +45,22 @@ function readAllCompanies_() {
 function listCompaniesFromSheet_(filter) {
   filter = filter || {};
   var data = readAllCompanies_();
-  var companies = data.rows.map(function (r) {
-    return rowToCompany_(data.headerIndex, r.values);
-  });
+  // 企業IDが空の行（テストデータ等の不正行）は一覧に含めない。他の行の処理は
+  // 止めず、スキップした行番号のみログに残す。
+  var companies = data.rows
+    .map(function (r) {
+      return { company: rowToCompany_(data.headerIndex, r.values), sheetRow: r.sheetRow };
+    })
+    .filter(function (entry) {
+      if (!entry.company.companyId) {
+        Logger.log('listCompaniesFromSheet_: 企業IDが空のためスキップしました（シート行 ' + entry.sheetRow + '）');
+        return false;
+      }
+      return true;
+    })
+    .map(function (entry) {
+      return entry.company;
+    });
 
   if (filter.keyword) {
     var keyword = String(filter.keyword).toLowerCase();
