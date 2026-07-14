@@ -25,6 +25,7 @@ const gasGlobals = {
 // in isolation, so cross-file references need to be declared here too.
 const gasProjectGlobals = {
   analyzeCompanyWebsite_: 'readonly',
+  analyzeWebsite_: 'readonly',
   backfillMissingHasReply_: 'readonly',
   backfillMissingSendStatus_: 'readonly',
   buildHeaderIndex_: 'readonly',

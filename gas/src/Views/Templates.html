@@ -42,11 +42,11 @@
     <div class="modal">
       <button type="button" class="modal__close" id="sales-template-modal-close" aria-label="閉じる">×</button>
       <h2 id="sales-template-modal-title">営業メールテンプレート</h2>
-      <label>表示名</label>
+      <label for="sales-template-display-name">表示名</label>
       <input type="text" id="sales-template-display-name" />
-      <label>件名</label>
+      <label for="sales-template-subject">件名</label>
       <input type="text" id="sales-template-subject" />
-      <label>本文テンプレート</label>
+      <label for="sales-template-body">本文テンプレート</label>
       <p class="templates__placeholder-hint">
         差し込み可能なタグ: <code>{{personalizedNote}}</code> <code>{{salesPersonName}}</code>
         <code>{{salesPersonTel}}</code> <code>{{salesPersonMail}}</code> <code>{{timeRexUrl}}</code>
@@ -63,9 +63,9 @@
     <div class="modal">
       <button type="button" class="modal__close" id="reply-template-modal-close" aria-label="閉じる">×</button>
       <h2 id="reply-template-modal-title">返信テンプレート</h2>
-      <label>表示名</label>
+      <label for="reply-template-display-name">表示名</label>
       <input type="text" id="reply-template-display-name" />
-      <label>本文</label>
+      <label for="reply-template-body">本文</label>
       <textarea id="reply-template-body" rows="10"></textarea>
       <div class="company-list__bulk-actions">
         <button type="button" class="button button--secondary" id="reply-template-modal-cancel">キャンセル</button>

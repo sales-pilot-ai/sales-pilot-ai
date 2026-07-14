@@ -41,6 +41,14 @@ function saveAllCompanyCandidates(candidates) {
   });
 }
 
+// ②企業検索（タスク2、追加依頼）: 検索結果の一覧表示化に伴い、Webサイト解析は
+// 検索実行時ではなく保存直前に候補1件ずつ実行するよう変更した（GASの6分実行制限対策）。
+// 解析ロジック自体（analyzeWebsite_）は新規追加せず既存のものをそのまま呼び出す。
+function analyzeCandidateWebsite(websiteUrl) {
+  requireUser_();
+  return analyzeWebsite_(websiteUrl);
+}
+
 // ③営業リスト一覧: キーワード・業種・送信状況・送信可否を指定して一覧を取得する
 function listCompanies(filter) {
   requireUser_();

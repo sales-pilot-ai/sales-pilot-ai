@@ -1,9 +1,18 @@
 <section class="search">
   <form id="search-form" class="search__form">
-    <label>業種 <input type="text" id="search-industry" placeholder="例: IT" /></label>
-    <label>エリア <input type="text" id="search-area" placeholder="例: 東京" /></label>
-    <label>取得件数 <input type="number" id="search-limit" value="20" min="1" max="50" /></label>
-    <label class="search__checkbox">
+    <div class="search__field">
+      <label for="search-industry">業種</label>
+      <input type="text" id="search-industry" placeholder="例: IT" />
+    </div>
+    <div class="search__field">
+      <label for="search-area">エリア</label>
+      <input type="text" id="search-area" placeholder="例: 東京" />
+    </div>
+    <div class="search__field">
+      <label for="search-limit">取得件数</label>
+      <input type="number" id="search-limit" value="20" min="1" max="50" />
+    </div>
+    <label class="search__checkbox" for="search-skip-analyzer">
       <input type="checkbox" id="search-skip-analyzer" />
       Webサイト解析をスキップする
     </label>
@@ -14,23 +23,25 @@
   <p id="search-loading" class="empty-state" hidden>検索中です…</p>
 
   <div id="search-review" class="search__review" hidden>
-    <p id="search-progress"></p>
-    <div class="candidate-card" id="candidate-card">
-      <div class="candidate-card__name" id="candidate-name"></div>
-      <div class="candidate-card__line" id="candidate-email"></div>
-      <div class="candidate-card__line" id="candidate-contact-form"></div>
-      <div class="candidate-card__line" id="candidate-website"></div>
-      <div class="candidate-card__line" id="candidate-address"></div>
-      <div class="candidate-card__line" id="candidate-industry"></div>
-      <div class="candidate-card__line" id="candidate-analysis" hidden></div>
-      <div class="candidate-card__actions">
-        <button type="button" class="button button--secondary" id="candidate-skip">スキップ</button>
-        <button type="button" class="button" id="candidate-save">保存</button>
+    <div class="search__list-toolbar">
+      <span id="search-list-count"></span>
+      <div class="search__list-toolbar-actions">
+        <button type="button" class="button button--secondary" id="candidate-select-all">全選択</button>
+        <button type="button" class="button button--secondary" id="candidate-deselect-all">全解除</button>
       </div>
     </div>
-    <div class="search__bulk-actions">
-      <button type="button" class="button button--secondary" id="candidate-save-all">残りをすべて保存</button>
-      <button type="button" class="button button--secondary" id="candidate-finish">終了する</button>
+
+    <div id="search-save-progress" class="company-list__bulk-progress" hidden>
+      <span id="search-save-progress-label" class="company-list__bulk-progress-label"></span>
+      <div class="progress-bar" id="search-save-progress-bar" role="progressbar" aria-label="保存の進捗" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar__fill" id="search-save-progress-fill"></div>
+      </div>
+    </div>
+
+    <div id="candidate-list"></div>
+
+    <div class="search__list-toolbar search__list-toolbar--bottom">
+      <button type="button" class="button" id="candidate-save-selected">選択した企業を保存</button>
     </div>
   </div>
 
@@ -40,78 +51,169 @@
 <script>
   (function () {
     var candidates = [];
-    var currentIndex = 0;
-    var counts = { created: 0, updated: 0, unchanged: 0, skipped: 0, error: 0 };
+    var selected = {}; // index(数値) -> boolean（デフォルトtrue）
+    var cardStatus = {}; // index(数値) -> 'created'|'updated'|'unchanged'|'error'（保存済みのみ設定）
+    var searchSkipAnalyzer = false; // 直近の検索でユーザーが指定した「解析をスキップする」の値
+    var isSaving = false;
 
     var form = document.getElementById('search-form');
     var errorEl = document.getElementById('search-error');
     var loadingEl = document.getElementById('search-loading');
     var reviewEl = document.getElementById('search-review');
     var summaryEl = document.getElementById('search-summary');
-    var progressEl = document.getElementById('search-progress');
+    var listCountEl = document.getElementById('search-list-count');
+    var listEl = document.getElementById('candidate-list');
+    var saveProgressEl = document.getElementById('search-save-progress');
+    var saveProgressLabelEl = document.getElementById('search-save-progress-label');
+    var saveProgressBarEl = document.getElementById('search-save-progress-bar');
+    var saveProgressFillEl = document.getElementById('search-save-progress-fill');
+    var saveSelectedButton = document.getElementById('candidate-save-selected');
+    var selectAllButton = document.getElementById('candidate-select-all');
+    var deselectAllButton = document.getElementById('candidate-deselect-all');
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+      });
+    }
 
     function showError(message) {
       errorEl.textContent = message;
       errorEl.hidden = false;
     }
 
+    // 一覧表示の時点では検索処理自体がWebサイト解析を行わない（下記フォーム送信処理を参照）ため、
+    // candidate.analysisは常にnullになる。既存の「不明（未解析）」表示文言をそのまま流用し、
+    // 保存時に解析される旨だけ追記する。
+    function candidateEmailLine(candidate) {
+      return candidate.analysis
+        ? 'メールアドレス: ' + (candidate.email || '取得できませんでした')
+        : 'メールアドレス: 不明（未解析・保存時に解析されます）';
+    }
+
+    function candidateContactFormLine(candidate) {
+      return candidate.analysis
+        ? 'お問い合わせフォーム: ' + (candidate.contactFormUrl || '取得できませんでした')
+        : 'お問い合わせフォーム: 不明（未解析・保存時に解析されます）';
+    }
+
+    function candidateAnalysisLine(candidate) {
+      if (!candidate.analysis) {
+        return '';
+      }
+      var a = candidate.analysis;
+      var lines = ['Webサイト解析: 解析URL=' + (a.analyzedUrl || '(なし)')];
+      lines.push('HTTPステータス=' + (a.httpStatus === null ? '(取得前に失敗)' : a.httpStatus));
+      lines.push(a.success ? '取得成功' : '取得失敗: ' + (a.error || '不明なエラー'));
+      if (a.success) {
+        lines.push(a.email ? 'メール抽出成功' : 'メール抽出失敗: ' + (a.emailError || '不明なエラー'));
+        lines.push(a.contactFormUrl ? '問い合わせフォーム抽出成功' : '問い合わせフォーム抽出失敗: ' + (a.contactFormError || '不明なエラー'));
+      }
+      return lines.join(' / ');
+    }
+
+    var STATUS_LABEL = {
+      created: '追加しました',
+      updated: '既存企業を更新しました',
+      unchanged: '変更なし（既存企業と同じ内容）',
+      error: '保存に失敗しました',
+    };
+
+    function renderCandidateCard(candidate, index) {
+      var isChecked = selected[index] !== false;
+      var status = cardStatus[index];
+      var analysisLine = candidateAnalysisLine(candidate);
+      var statusHtml = status
+        ? '<div class="candidate-card__result candidate-card__result--' + escapeHtml(status) + '">' +
+          escapeHtml(STATUS_LABEL[status] || status) +
+          '</div>'
+        : '';
+
+      return (
+        '<div class="candidate-card" data-index="' + index + '">' +
+        '<div class="candidate-card__header">' +
+        '<input type="checkbox" class="candidate-select-checkbox" id="candidate-select-' + index + '" data-index="' + index + '"' +
+        (isChecked ? ' checked' : '') +
+        (status ? ' disabled' : '') +
+        ' />' +
+        '<label class="candidate-card__name" for="candidate-select-' + index + '">' +
+        escapeHtml(candidate.companyName || '(会社名不明)') +
+        '</label>' +
+        '</div>' +
+        '<div class="candidate-card__line">' + escapeHtml(candidateEmailLine(candidate)) + '</div>' +
+        '<div class="candidate-card__line">' + escapeHtml(candidateContactFormLine(candidate)) + '</div>' +
+        '<div class="candidate-card__line">' + escapeHtml('ホームページ: ' + (candidate.websiteUrl || '不明')) + '</div>' +
+        '<div class="candidate-card__line">' + escapeHtml([candidate.address, candidate.phone].filter(Boolean).join(' / ')) + '</div>' +
+        '<div class="candidate-card__line">' + escapeHtml('業種: ' + (candidate.industry || '不明')) + '</div>' +
+        (analysisLine ? '<div class="candidate-card__line candidate-card__line--analysis">' + escapeHtml(analysisLine) + '</div>' : '') +
+        statusHtml +
+        '</div>'
+      );
+    }
+
+    function updateListCount() {
+      var selectedCount = candidates.filter(function (_candidate, i) {
+        return selected[i] !== false;
+      }).length;
+      listCountEl.textContent = candidates.length + '件中 ' + selectedCount + '件選択中';
+    }
+
+    function renderList() {
+      listEl.innerHTML = candidates.map(renderCandidateCard).join('');
+      updateListCount();
+    }
+
+    listEl.addEventListener('change', function (event) {
+      var checkbox = event.target.closest('.candidate-select-checkbox');
+      if (!checkbox) {
+        return;
+      }
+      var index = Number(checkbox.getAttribute('data-index'));
+      selected[index] = checkbox.checked;
+      updateListCount();
+    });
+
+    selectAllButton.addEventListener('click', function () {
+      candidates.forEach(function (_candidate, i) {
+        if (!cardStatus[i]) {
+          selected[i] = true;
+        }
+      });
+      renderList();
+    });
+
+    deselectAllButton.addEventListener('click', function () {
+      candidates.forEach(function (_candidate, i) {
+        if (!cardStatus[i]) {
+          selected[i] = false;
+        }
+      });
+      renderList();
+    });
+
     function renderSummary() {
+      var counts = { created: 0, updated: 0, unchanged: 0, error: 0 };
+      var notProcessed = 0;
+      candidates.forEach(function (_candidate, i) {
+        if (cardStatus[i]) {
+          counts[cardStatus[i]] = (counts[cardStatus[i]] || 0) + 1;
+        } else {
+          notProcessed += 1;
+        }
+      });
       summaryEl.hidden = false;
-      var remaining = Math.max(candidates.length - currentIndex, 0);
       summaryEl.textContent =
         'サマリー: 追加 ' +
         counts.created +
         '件 / 重複更新 ' +
         counts.updated +
-        '件 / スキップ ' +
-        counts.skipped +
-        '件 / 残り ' +
-        remaining +
+        '件 / 変更なし ' +
+        counts.unchanged +
+        '件 / 失敗 ' +
+        counts.error +
+        '件 / 未保存 ' +
+        notProcessed +
         '件';
-    }
-
-    function renderCurrentCandidate() {
-      if (currentIndex >= candidates.length) {
-        reviewEl.hidden = true;
-        renderSummary();
-        return;
-      }
-      var candidate = candidates[currentIndex];
-      progressEl.textContent = '候補 ' + (currentIndex + 1) + '/' + candidates.length;
-      document.getElementById('candidate-name').textContent = candidate.companyName || '(会社名不明)';
-      document.getElementById('candidate-email').textContent = candidate.analysis
-        ? 'メールアドレス: ' + (candidate.email || '取得できませんでした')
-        : 'メールアドレス: 不明（未解析）';
-      document.getElementById('candidate-contact-form').textContent = candidate.analysis
-        ? 'お問い合わせフォーム: ' + (candidate.contactFormUrl || '取得できませんでした')
-        : 'お問い合わせフォーム: 不明（未解析）';
-      document.getElementById('candidate-website').textContent = candidate.websiteUrl || 'ホームページ: 不明';
-      document.getElementById('candidate-address').textContent =
-        [candidate.address, candidate.phone].filter(Boolean).join(' / ');
-      document.getElementById('candidate-industry').textContent = '業種: ' + (candidate.industry || '不明');
-
-      var analysisEl = document.getElementById('candidate-analysis');
-      if (candidate.analysis) {
-        var a = candidate.analysis;
-        var lines = ['Webサイト解析: 解析URL=' + (a.analyzedUrl || '(なし)')];
-        lines.push('HTTPステータス=' + (a.httpStatus === null ? '(取得前に失敗)' : a.httpStatus));
-        lines.push(a.success ? '取得成功' : '取得失敗: ' + (a.error || '不明なエラー'));
-        if (a.success) {
-          lines.push(a.email ? 'メール抽出成功' : 'メール抽出失敗: ' + (a.emailError || '不明なエラー'));
-          lines.push(a.contactFormUrl ? '問い合わせフォーム抽出成功' : '問い合わせフォーム抽出失敗: ' + (a.contactFormError || '不明なエラー'));
-        }
-        analysisEl.textContent = lines.join(' / ');
-        analysisEl.hidden = false;
-      } else {
-        analysisEl.hidden = true;
-      }
-
-      renderSummary();
-    }
-
-    function advance() {
-      currentIndex += 1;
-      renderCurrentCandidate();
     }
 
     form.addEventListener('submit', function (event) {
@@ -121,25 +223,35 @@
       reviewEl.hidden = true;
       summaryEl.hidden = true;
 
+      searchSkipAnalyzer = document.getElementById('search-skip-analyzer').checked;
+
       var params = {
         industry: document.getElementById('search-industry').value,
         area: document.getElementById('search-area').value,
         limit: Number(document.getElementById('search-limit').value) || 20,
-        skipAnalyzer: document.getElementById('search-skip-analyzer').checked,
+        // 一覧表示にあたり、検索実行時はWebサイト解析を常にスキップする（タスク2⑤）。
+        // GASの6分実行制限に抵触しないよう、解析は保存時に選択された企業ごとへ個別実行する
+        // （searchCompaniesViaMaps_自体の仕様・スキップ判定ロジックは変更していない。
+        // ユーザーが「解析をスキップする」を指定していた場合は、保存時も解析を行わない
+        // ことでチェックボックスの意味を従来通り保つ。searchSkipAnalyzer参照）。
+        skipAnalyzer: true,
       };
 
       google.script.run
         .withSuccessHandler(function (result) {
           loadingEl.hidden = true;
           candidates = result || [];
-          currentIndex = 0;
-          counts = { created: 0, updated: 0, unchanged: 0, skipped: 0, error: 0 };
+          selected = {};
+          cardStatus = {};
+          candidates.forEach(function (_candidate, i) {
+            selected[i] = true;
+          });
           if (candidates.length === 0) {
             showError('該当する企業が見つかりませんでした。');
             return;
           }
           reviewEl.hidden = false;
-          renderCurrentCandidate();
+          renderList();
         })
         .withFailureHandler(function (error) {
           loadingEl.hidden = true;
@@ -148,45 +260,96 @@
         .searchCompanies(params);
     });
 
-    document.getElementById('candidate-skip').addEventListener('click', function () {
-      counts.skipped += 1;
-      advance();
-    });
+    function updateSaveProgress(processed, total) {
+      saveProgressEl.hidden = false;
+      saveProgressLabelEl.textContent = '保存中… ' + processed + '/' + total + '件';
+      var percent = total > 0 ? Math.round((processed / total) * 100) : 0;
+      saveProgressFillEl.style.width = percent + '%';
+      saveProgressBarEl.setAttribute('aria-valuenow', String(percent));
+    }
 
-    document.getElementById('candidate-save').addEventListener('click', function () {
-      var candidate = candidates[currentIndex];
+    function hideSaveProgress() {
+      saveProgressEl.hidden = true;
+      saveProgressLabelEl.textContent = '';
+      saveProgressFillEl.style.width = '0%';
+      saveProgressBarEl.removeAttribute('aria-valuenow');
+    }
+
+    // 選択された候補を1件ずつ保存する。解析をスキップしていない場合は、保存の直前に
+    // 既存のanalyzeWebsite_（Router経由: analyzeCandidateWebsite）でその企業のWebサイトのみを
+    // 解析し、結果をcandidateへ反映してから既存のsaveCompanyCandidate（変更なし）を呼ぶ。
+    // 1件ずつ個別のgoogle.script.run呼び出しにすることで、まとめて解析していた従来方式に
+    // 比べGASの6分実行制限に抵触しにくくする（タスク2⑤で採用した方式）。
+    function saveOneCandidate(index, onDone) {
+      var candidate = candidates[index];
+
+      function doSave() {
+        google.script.run
+          .withSuccessHandler(function (result) {
+            cardStatus[index] = result.status;
+            onDone();
+          })
+          .withFailureHandler(function () {
+            cardStatus[index] = 'error';
+            onDone();
+          })
+          .saveCompanyCandidate(candidate);
+      }
+
+      if (searchSkipAnalyzer) {
+        doSave();
+        return;
+      }
+
       google.script.run
-        .withSuccessHandler(function (result) {
-          counts[result.status] = (counts[result.status] || 0) + 1;
-          advance();
+        .withSuccessHandler(function (analysis) {
+          candidate.analysis = analysis;
+          candidate.email = analysis && analysis.email ? analysis.email : '';
+          candidate.contactFormUrl = analysis && analysis.contactFormUrl ? analysis.contactFormUrl : '';
+          doSave();
         })
-        .withFailureHandler(function (error) {
-          showError(error && error.message ? error.message : String(error));
-          counts.error += 1;
-          advance();
+        .withFailureHandler(function () {
+          // Webサイト解析はベストエフォートのため、失敗しても保存自体は続行する。
+          doSave();
         })
-        .saveCompanyCandidate(candidate);
-    });
+        .analyzeCandidateWebsite(candidate.websiteUrl);
+    }
 
-    document.getElementById('candidate-save-all').addEventListener('click', function () {
-      var remaining = candidates.slice(currentIndex);
-      google.script.run
-        .withSuccessHandler(function (results) {
-          (results || []).forEach(function (result) {
-            counts[result.status] = (counts[result.status] || 0) + 1;
-          });
-          currentIndex = candidates.length;
-          renderCurrentCandidate();
-        })
-        .withFailureHandler(function (error) {
-          showError(error && error.message ? error.message : String(error));
-        })
-        .saveAllCompanyCandidates(remaining);
-    });
+    function runSaveQueue(indexes, processed) {
+      if (processed >= indexes.length) {
+        isSaving = false;
+        hideSaveProgress();
+        saveSelectedButton.disabled = false;
+        renderList();
+        renderSummary();
+        return;
+      }
+      updateSaveProgress(processed, indexes.length);
+      saveOneCandidate(indexes[processed], function () {
+        runSaveQueue(indexes, processed + 1);
+      });
+    }
 
-    document.getElementById('candidate-finish').addEventListener('click', function () {
-      currentIndex = candidates.length;
-      renderCurrentCandidate();
+    saveSelectedButton.addEventListener('click', function () {
+      if (isSaving) {
+        return;
+      }
+      var indexes = candidates
+        .map(function (_candidate, i) {
+          return i;
+        })
+        .filter(function (i) {
+          return selected[i] !== false && !cardStatus[i];
+        });
+
+      if (indexes.length === 0) {
+        showToast('保存する企業を選択してください。', 'info');
+        return;
+      }
+
+      isSaving = true;
+      saveSelectedButton.disabled = true;
+      runSaveQueue(indexes, 0);
     });
   })();
 </script>

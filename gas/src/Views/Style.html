@@ -319,18 +319,43 @@
     margin-bottom: 24px;
   }
 
-  .search__form label {
+  /* タスク1: 業種・エリア・取得件数は、labelを入力欄に暗黙的にネストする方式から
+     for属性による明示的な関連付けに変更した（追加依頼）。レイアウトは.search__field
+     というラッパーで従来通りlabel+inputをひとまとまりにして維持する。 */
+  .search__field {
     display: flex;
     align-items: center;
     gap: 6px;
   }
 
   .search__checkbox {
+    display: flex;
+    align-items: center;
     gap: 8px !important;
   }
 
   .search__review {
     max-width: 480px;
+  }
+
+  /* 検索結果の一覧表示・複数選択保存（タスク2、追加依頼）。 */
+  .search__list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .search__list-toolbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .search__list-toolbar--bottom {
+    justify-content: flex-end;
+    margin-top: 16px;
+    margin-bottom: 0;
   }
 
   .candidate-card {
@@ -340,10 +365,17 @@
     margin-bottom: 16px;
   }
 
+  .candidate-card__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
   .candidate-card__name {
     font-size: 16px;
     font-weight: 700;
-    margin-bottom: 8px;
+    cursor: pointer;
   }
 
   .candidate-card__line {
@@ -351,17 +383,20 @@
     margin-bottom: 4px;
   }
 
-  .candidate-card__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 16px;
+  .candidate-card__result {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
   }
 
-  .search__bulk-actions {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
+  .candidate-card__result--created,
+  .candidate-card__result--updated,
+  .candidate-card__result--unchanged {
+    color: var(--color-success);
+  }
+
+  .candidate-card__result--error {
+    color: var(--color-error);
   }
 
   .search__summary {

@@ -112,9 +112,9 @@
       <h2>営業メール・DM下書き</h2>
       <p id="draft-modal-error" class="error-message" hidden></p>
       <div id="draft-modal-body-wrapper" hidden>
-        <label>件名</label>
+        <label for="draft-modal-subject">件名</label>
         <input type="text" id="draft-modal-subject" readonly />
-        <label>本文</label>
+        <label for="draft-modal-content">本文</label>
         <textarea id="draft-modal-content" rows="10" readonly></textarea>
       </div>
     </div>
@@ -134,7 +134,7 @@
     <div class="modal">
       <button type="button" class="modal__close" id="status-change-modal-close" aria-label="閉じる">×</button>
       <h2>ステータス変更</h2>
-      <label>変更先ステータス</label>
+      <label for="status-change-select">変更先ステータス</label>
       <select id="status-change-select">
         <option value="未送信">送信待ち</option>
         <option value="送信済">送信済</option>

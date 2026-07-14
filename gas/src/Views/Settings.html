@@ -8,33 +8,33 @@
       <p class="templates__placeholder-hint">
         営業メール・返信メールの署名に使用する情報です。実際の送信は、ログイン中のGoogleアカウントのGmailから行われます。
       </p>
-      <label>担当者名</label>
+      <label for="setting-sales-person-name">担当者名</label>
       <input type="text" id="setting-sales-person-name" required />
-      <label>電話番号</label>
+      <label for="setting-sales-person-tel">電話番号</label>
       <input type="text" id="setting-sales-person-tel" required />
-      <label>メールアドレス</label>
+      <label for="setting-sales-person-mail">メールアドレス</label>
       <input type="email" id="setting-sales-person-mail" required />
     </div>
 
     <div class="settings__section">
       <h2>Gemini API設定</h2>
-      <label>APIキー <span id="setting-gemini-api-key-status" class="settings__key-status"></span></label>
+      <label for="setting-gemini-api-key">APIキー <span id="setting-gemini-api-key-status" class="settings__key-status"></span></label>
       <input type="password" id="setting-gemini-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
-      <label>使用モデル</label>
+      <label for="setting-gemini-model">使用モデル</label>
       <input type="text" id="setting-gemini-model" />
     </div>
 
     <div class="settings__section">
       <h2>システム設定</h2>
-      <label>スプレッドシートID</label>
+      <label for="setting-spreadsheet-id">スプレッドシートID</label>
       <input type="text" id="setting-spreadsheet-id" required />
-      <label>Google Maps APIキー <span id="setting-maps-api-key-status" class="settings__key-status"></span></label>
+      <label for="setting-maps-api-key">Google Maps APIキー <span id="setting-maps-api-key-status" class="settings__key-status"></span></label>
       <input type="password" id="setting-maps-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
     </div>
 
     <div class="settings__section">
       <h2>デフォルト値設定</h2>
-      <label>TimeRex（日程調整）URL</label>
+      <label for="setting-timerex-url">TimeRex（日程調整）URL</label>
       <input type="text" id="setting-timerex-url" />
     </div>
 
@@ -70,11 +70,11 @@
   <div class="modal">
     <button type="button" class="modal__close" id="user-create-modal-close" aria-label="閉じる">×</button>
     <h2>新規ユーザー追加</h2>
-    <label>名前</label>
+    <label for="user-create-name">名前</label>
     <input type="text" id="user-create-name" />
-    <label>メールアドレス</label>
+    <label for="user-create-email">メールアドレス</label>
     <input type="email" id="user-create-email" />
-    <label>権限</label>
+    <label for="user-create-role">権限</label>
     <select id="user-create-role">
       <option value="User">User</option>
       <option value="Admin">Admin</option>
