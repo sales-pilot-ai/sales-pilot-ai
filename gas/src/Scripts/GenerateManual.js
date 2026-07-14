@@ -498,10 +498,63 @@ function writeCoverSheet_(sheet, spreadsheet, tabSheets) {
   sheet.autoResizeColumns(1, 1);
 }
 
+var MANUAL_SPREADSHEET_TITLE = 'Sales Pilot AI 取扱説明書';
+
+// 前回までの実行で作成された同名のスプレッドシート（共有設定前に落ちた中途半端なものや、
+// 再実行による重複）をゴミ箱へ移動する。見つからない場合は何もしない。完全削除ではなく
+// setTrashed(true)によるゴミ箱移動のため、誤って必要なファイルを消してもDrive側から復元できる。
+function trashExistingManualSpreadsheets_() {
+  var files = DriveApp.getFilesByName(MANUAL_SPREADSHEET_TITLE);
+  var trashedCount = 0;
+  while (files.hasNext()) {
+    var file = files.next();
+    file.setTrashed(true);
+    trashedCount += 1;
+  }
+  if (trashedCount > 0) {
+    Logger.log('前回実行分の同名スプレッドシートを' + trashedCount + '件ゴミ箱へ移動しました。');
+  }
+}
+
+// スプレッドシートの共有設定を行う。DriveApp.Access.DOMAIN_WITH_LINK（同一ドメイン内で
+// リンクを知っている人は閲覧可）はGoogle Workspaceのドメイン付きアカウントでのみ有効で、
+// 個人のGoogleアカウント（例: @gmail.com）がスクリプトの実行者の場合、ファイルに紐づく
+// ドメインが存在しないため「Invalid argument: permission.value」で失敗する。
+// そのため、まずDOMAIN_WITH_LINKを試み、失敗した場合のみANYONE_WITH_LINK（リンクを知っている
+// 人は誰でも閲覧可）にフォールバックする。フォールバックした場合はその旨をLogger.logに残す
+// （ドメイン限定より共有範囲が広がるため、必要であれば手動で共有設定を絞ってもらう想定）。
+function shareManualSpreadsheet_(ss) {
+  var file = DriveApp.getFileById(ss.getId());
+  try {
+    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    Logger.log('共有設定: 同一ドメイン内でリンクを知っている人が閲覧可能です。');
+    return;
+  } catch (domainError) {
+    Logger.log(
+      '共有設定: ドメイン限定（DOMAIN_WITH_LINK）の設定に失敗したため、' +
+        'リンクを知っている人は誰でも閲覧可（ANYONE_WITH_LINK）にフォールバックします。' +
+        '（実行アカウントがGoogle Workspaceのドメイン付きアカウントでない場合に起こります） エラー: ' +
+        domainError.message
+    );
+  }
+
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    Logger.log('共有設定: リンクを知っている人は誰でも閲覧可能です（ドメイン限定は使用できませんでした）。');
+  } catch (anyoneError) {
+    Logger.log(
+      '共有設定に失敗しました。スプレッドシート自体は作成済みのため、Drive上で手動で共有設定を行ってください。エラー: ' +
+        anyoneError.message
+    );
+  }
+}
+
 // docs/manual-source.md の内容を、社内配布用の新規Googleスプレッドシートとして出力する。
 // Apps Scriptエディタの実行対象一覧に表示されるよう、アンダースコアなしの関数名にしている。
 function generateManualSpreadsheet() {
-  var ss = SpreadsheetApp.create('Sales Pilot AI 取扱説明書');
+  trashExistingManualSpreadsheets_();
+
+  var ss = SpreadsheetApp.create(MANUAL_SPREADSHEET_TITLE);
 
   var coverSheet = ss.getSheets()[0];
   coverSheet.setName('表紙');
@@ -521,8 +574,7 @@ function generateManualSpreadsheet() {
   writeErrorsSheet_(errorsSheet);
   writeCoverSheet_(coverSheet, ss, [screensSheet, flowSheet, buttonsSheet, permissionsSheet, notesSheet, errorsSheet]);
 
-  // 同一ドメイン内でリンクを知っている人は誰でも閲覧可（編集不可）にする。
-  DriveApp.getFileById(ss.getId()).setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+  shareManualSpreadsheet_(ss);
 
   var url = ss.getUrl();
   Logger.log('取扱説明書スプレッドシートを作成しました: ' + url);
