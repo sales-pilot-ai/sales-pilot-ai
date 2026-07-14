@@ -255,10 +255,11 @@ function upsertCompanyCandidate_(candidate) {
 
     var companyId = nextCompanyId_(data);
     var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-    // 企業検索の候補（candidate）は返信有無を持たないため、空欄のまま保存されないよう
-    // 明示的に初期値を設定する（タスクC）。candidateが万一hasReplyを持つ場合はそちらを優先する。
+    // 企業検索の候補（candidate）は返信有無・送信状況を持たないため、空欄のまま保存されないよう
+    // 明示的に初期値を設定する（タスクC・送信状況版）。candidateが万一これらのフィールドを
+    // 持つ場合はそちらを優先する。
     var row = companyToRow_(
-      Object.assign({ hasReply: HAS_REPLY.NO }, candidate, {
+      Object.assign({ hasReply: HAS_REPLY.NO, sendStatus: SEND_STATUS.NOT_SENT }, candidate, {
         companyId: companyId,
         updatedAt: now,
       })
@@ -289,6 +290,32 @@ function backfillMissingHasReply_() {
   for (var i = 0; i < values.length; i++) {
     if (!values[i][0]) {
       sheet.getRange(i + 2, hasReplyCol + 1).setValue(HAS_REPLY.NO);
+      updatedCount += 1;
+    }
+  }
+  return { updatedCount: updatedCount };
+}
+
+// 送信状況版のbackfill（追加依頼）。既存の営業リストで「送信状況」が空欄の行にのみ
+// 初期値（SEND_STATUS.NOT_SENT = '未送信'）を補完する。既に何らかの値（'送信済'等）が
+// 入っている行は絶対に上書きしない。Apps Scriptエディタの実行欄から手動で一度だけ
+// 実行する想定（Router経由では公開しない）。
+function backfillMissingSendStatus_() {
+  var sheet = getCompanySheet_();
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return { updatedCount: 0 };
+  }
+  var headerIndex = buildHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+  var sendStatusCol = headerIndex['送信状況'];
+  if (sendStatusCol === undefined) {
+    return { updatedCount: 0 };
+  }
+  var values = sheet.getRange(2, sendStatusCol + 1, lastRow - 1, 1).getValues();
+  var updatedCount = 0;
+  for (var i = 0; i < values.length; i++) {
+    if (!values[i][0]) {
+      sheet.getRange(i + 2, sendStatusCol + 1).setValue(SEND_STATUS.NOT_SENT);
       updatedCount += 1;
     }
   }

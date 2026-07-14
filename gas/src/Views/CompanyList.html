@@ -98,6 +98,14 @@
 
   <div class="company-list__pagination" id="pagination" hidden></div>
 
+  <div class="modal-overlay" id="ai-summary-modal" hidden>
+    <div class="modal">
+      <button type="button" class="modal__close" id="ai-summary-modal-close" aria-label="閉じる">×</button>
+      <h2>AI要約</h2>
+      <p id="ai-summary-modal-body"></p>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="draft-modal" hidden>
     <div class="modal">
       <button type="button" class="modal__close" id="draft-modal-close" aria-label="閉じる">×</button>
@@ -259,6 +267,9 @@
     var bulkProgressBarEl = document.getElementById('bulk-progress-bar');
     var companyListRootEl = document.getElementById('company-list-root');
     var statusUndoBarEl = document.getElementById('status-undo-bar');
+
+    var aiSummaryModal = document.getElementById('ai-summary-modal');
+    var aiSummaryModalBody = document.getElementById('ai-summary-modal-body');
 
     var draftModal = document.getElementById('draft-modal');
     var draftModalError = document.getElementById('draft-modal-error');
@@ -909,6 +920,18 @@
       );
     }
 
+    // AI要約セルクリックで全文表示（追加依頼）。AI要約のデータ・生成ロジックには手を
+    // 加えず、既に描画済みのtitle属性（常に全文が入っている。handleAnalyzeClickの更新後も
+    // 同様）をそのままモーダルに表示するだけの読み取り専用機能。
+    function openAiSummaryModal(summaryText) {
+      aiSummaryModalBody.textContent = summaryText;
+      aiSummaryModal.hidden = false;
+    }
+
+    function closeAiSummaryModal() {
+      aiSummaryModal.hidden = true;
+    }
+
     function openDraftModal() {
       draftModal.hidden = false;
     }
@@ -1099,6 +1122,14 @@
       }
       var companyId = row.getAttribute('data-company-id');
 
+      var summaryCellClicked = event.target.closest('.ai-summary-cell');
+      if (summaryCellClicked) {
+        if (summaryCellClicked.title) {
+          openAiSummaryModal(summaryCellClicked.title);
+        }
+        return;
+      }
+
       var analyzeBtn = event.target.closest('[data-action="analyze"]');
       if (analyzeBtn) {
         handleAnalyzeClick(analyzeBtn, companyId);
@@ -1138,6 +1169,13 @@
         }
 
         handleSendMailClick(sendMailBtn, companyId);
+      }
+    });
+
+    document.getElementById('ai-summary-modal-close').addEventListener('click', closeAiSummaryModal);
+    aiSummaryModal.addEventListener('click', function (event) {
+      if (event.target === aiSummaryModal) {
+        closeAiSummaryModal();
       }
     });
 

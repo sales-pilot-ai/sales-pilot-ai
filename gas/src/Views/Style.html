@@ -800,6 +800,12 @@
     white-space: nowrap;
   }
 
+  /* クリックで全文表示できるセルのみポインターカーソルにする（追加依頼）。
+     titleは常に全文と同期しているため、空でない場合のみ表示対象。 */
+  .ai-summary-cell[title]:not([title='']) {
+    cursor: pointer;
+  }
+
   .company-table__ai-actions {
     display: flex;
     gap: 8px;

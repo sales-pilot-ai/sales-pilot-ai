@@ -36,6 +36,14 @@ function runBackfillMissingHasReply() {
   Logger.log('runBackfillMissingHasReply: updatedCount=' + result.updatedCount);
 }
 
+// 「送信状況」版のbackfill実行用ラッパー（追加依頼）。backfillMissingSendStatus_
+// （末尾アンダースコア付き）はApps Scriptエディタの実行欄のドロップダウンに表示されないため、
+// アンダースコアなしのこの関数をエディタから一度だけ手動実行する。
+function runBackfillMissingSendStatus() {
+  var result = backfillMissingSendStatus_();
+  Logger.log('runBackfillMissingSendStatus: updatedCount=' + result.updatedCount);
+}
+
 // 権限シートの秘匿化（タスクD代替案①・採用済み）。共有スプレッドシートを他メンバーと
 // 共有しても、「権限」シートだけは非表示にする。
 //

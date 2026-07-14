@@ -26,6 +26,7 @@ const gasGlobals = {
 const gasProjectGlobals = {
   analyzeCompanyWebsite_: 'readonly',
   backfillMissingHasReply_: 'readonly',
+  backfillMissingSendStatus_: 'readonly',
   buildHeaderIndex_: 'readonly',
   buildSalesEmailBody_: 'readonly',
   buildSalesEmailSubject_: 'readonly',
