@@ -39,6 +39,13 @@
     flex-shrink: 0;
     padding: 20px 16px;
     border-right: 1px solid var(--color-border);
+    /* サイドバー固定表示（追加依頼）: メインコンテンツをスクロールしても画面内に留まるよう
+       positionをstickyにし、サイドバー自体がビューポートより長くなる場合のみサイドバー内で
+       独立してスクロールできるようにする（ページ全体の二重スクロールにはならない）。 */
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
   }
 
   .app-sidebar__brand {
@@ -1132,6 +1139,11 @@
       border-right: none;
       border-bottom: 1px solid var(--color-border);
       padding: 12px 16px;
+      /* モバイル幅では従来どおり横並びの折りたたみメニューとして扱うため、
+         デスクトップ向けの固定表示（sticky・vh高さ）は無効化する。 */
+      position: static;
+      height: auto;
+      overflow-y: visible;
     }
 
     .app-sidebar__menu-toggle {
