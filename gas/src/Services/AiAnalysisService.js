@@ -277,7 +277,9 @@ function buildDraftPrompt_(analysis, companyName, tone) {
 // Geminiによる個別文言の生成に失敗した場合も、営業メール生成全体を失敗にはせず、
 // その段落を省いたテンプレートのみで下書きを作成する（フォールバック）。
 // 下書きは履歴を持たず、企業分析シートの下書き列を直近1件のみ上書き保存する。
-function generateSalesDraft_(companyId, tone, templateId) {
+// emailは営業メール生成を実行した本人（ログイン中ユーザー）のメールアドレスで、
+// 本文中の{{salesPersonName}}等の署名プレースホルダーの解決に使う（追加依頼）。
+function generateSalesDraft_(companyId, tone, templateId, email) {
   var analysis = getCompanyAnalysisRow_(companyId);
   var now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
   var resolvedTone = tone || DEFAULT_DRAFT_TONE;
@@ -310,7 +312,7 @@ function generateSalesDraft_(companyId, tone, templateId) {
   }
 
   result.draftSubject = buildSalesEmailSubject_(analysis.companyName, templateId);
-  result.draftBody = buildSalesEmailBody_(analysis.companyName, personalizedNote, templateId);
+  result.draftBody = buildSalesEmailBody_(analysis.companyName, personalizedNote, templateId, email);
   result.draftStatus = '成功';
 
   upsertCompanyAnalysisFields_(companyId, result);

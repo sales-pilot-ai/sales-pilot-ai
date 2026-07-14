@@ -67,9 +67,11 @@ function analyzeCompanyInfo(companyId) {
 
 // ⑥AI分析: 保存済みの企業分析結果を元に営業メール・DM下書き（件名・本文）を生成する。
 // templateIdを省略した場合はデフォルトの営業メールテンプレートを使用する（Sprint7⑤）。
+// 署名（{{salesPersonName}}等）は、この操作を実行した本人（ログイン中ユーザー）自身の
+// Gmail設定（送信者情報）から解決される（追加依頼: Gmail設定の個人化）。
 function generateSalesDraft(companyId, tone, templateId) {
-  requireUser_();
-  return generateSalesDraft_(companyId, tone, templateId);
+  var user = requireUser_();
+  return generateSalesDraft_(companyId, tone, templateId, user.email);
 }
 
 // ⑦Gmail下書き作成: Step5で生成済みの営業メール下書き（件名・本文）を使ってGmailの下書きを作成する
@@ -194,8 +196,9 @@ function setDefaultSalesTemplate(templateId) {
   return setDefaultSalesTemplate_(templateId);
 }
 
-// ㉒設定画面（Sprint7⑥）: スクリプトプロパティ（Gmail送信者情報・Gemini API・
-// システム設定・デフォルト値）の参照・更新。Adminのみ。
+// ㉒設定画面（Sprint7⑥）: スクリプトプロパティ（Gemini API・システム設定・デフォルト値）の
+// 参照・更新。Adminのみ（Gmail送信者情報は追加依頼によりユーザーごとの個別管理に変更したため
+// ここでは扱わない。下記getMySenderInfo/updateMySenderInfoを参照）。
 function getSettings() {
   requireAdmin_();
   return getSettingsForAdmin_();
@@ -204,6 +207,20 @@ function getSettings() {
 function updateSettings(data) {
   requireAdmin_();
   return updateSettings_(data);
+}
+
+// Gmail設定（送信者情報、追加依頼）: 営業メール・返信メールの署名に使う名前・電話番号・
+// メールアドレスをユーザーごとに管理する。User/Admin問わず全員が利用でき、常に
+// ログイン中の本人自身の情報のみを参照・更新する（emailをクライアントから受け取らず、
+// requireUser_()が返す本人のメールアドレスを使うため、他人の情報は編集できない）。
+function getMySenderInfo() {
+  var user = requireUser_();
+  return getSenderInfoForUser_(user.email);
+}
+
+function updateMySenderInfo(data) {
+  var user = requireUser_();
+  return updateSenderInfoForUser_(user.email, data);
 }
 
 // ㉓営業レポート（Sprint7⑦）: 総企業数・送信率・返信率・商談率・成約率・月別送信件数の推移を返す
@@ -311,7 +328,7 @@ function debugAnalyzeCompanyC000001() {
 // DEBUG (Sprint3 Step3動作確認用。確認後に削除する): 指定した企業IDの営業メール・DM下書きを生成する。
 // 事前にdebugAnalyzeCompany等で企業情報解析が完了している必要がある。
 function debugGenerateDraft(companyId, tone) {
-  var result = generateSalesDraft_(companyId, tone);
+  var result = generateSalesDraft_(companyId, tone, null, Session.getActiveUser().getEmail());
   Logger.log('debugGenerateDraft: result=' + JSON.stringify(result));
   return result;
 }

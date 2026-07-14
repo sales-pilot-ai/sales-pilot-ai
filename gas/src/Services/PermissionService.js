@@ -4,7 +4,9 @@
 // （クライアント側の表示切り替えだけに依存しない。設計制約⑥参照）。
 
 var PERMISSION_SHEET_NAME = '権限';
-var PERMISSION_HEADERS = ['メールアドレス', '名前', '権限', '作成日時', '最終ログイン日時'];
+// 電話番号・送信者メールは、Gmail設定（送信者情報）のユーザーごとの個別管理化（追加依頼）で
+// 追加した列。ensureHeaders_により既存シートにも自動で追記される。
+var PERMISSION_HEADERS = ['メールアドレス', '名前', '権限', '作成日時', '最終ログイン日時', '電話番号', '送信者メール'];
 var USER_ROLE = { ADMIN: 'Admin', USER: 'User' };
 
 // 「権限が設定されていません」画面をクライアント側で判定するための専用エラーメッセージ。
@@ -49,6 +51,8 @@ function rowToUser_(headerIndex, row) {
     role: row[headerIndex['権限']],
     createdAt: formatPermissionDateValue_(row[headerIndex['作成日時']]),
     lastLoginAt: formatPermissionDateValue_(row[headerIndex['最終ログイン日時']]),
+    tel: row[headerIndex['電話番号']],
+    senderMail: row[headerIndex['送信者メール']],
   };
 }
 
@@ -253,6 +257,57 @@ function deleteUser_(email, currentEmail) {
       throw new Error('最後の1人のAdminは削除できません。');
     }
     sheet.deleteRow(rowIndex);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// Gmail設定（送信者情報、追加依頼）: 営業メール・返信メールの署名に使う名前・電話番号・
+// メールアドレスを、共通のScript Propertiesではなくユーザーごとに権限シート上で管理する。
+// 名前は既存の「名前」列（サイドバー表示・ユーザー管理と共通）をそのまま使う。
+//
+// 電話番号・送信者メールが未設定（列追加直後でまだ個別に保存していない）の場合は、
+// 移行前の共通設定値（Script Properties、Config/Settings.js）へフォールバックする。
+// 「初回は共通設定と同じ値からスタートし、以降は個別に編集できる」という要件を、
+// 別途の一括移行処理を用意せず、読み取り時のフォールバックだけで満たすための実装。
+// 送信者メールが共通設定にも無い場合は、ログイン中のGoogleアカウントのメールアドレスを
+// 既定値として使う。
+function getSenderInfoForUser_(email) {
+  var user = findUserByEmail_(email);
+  if (!user) {
+    throw new Error('ユーザーが見つかりません（' + email + '）。');
+  }
+  var props = PropertiesService.getScriptProperties();
+  return {
+    name: user.name,
+    tel: user.tel || props.getProperty(SETTINGS_KEYS.SALES_PERSON_TEL) || '',
+    mail: user.senderMail || props.getProperty(SETTINGS_KEYS.SALES_PERSON_MAIL) || user.email,
+  };
+}
+
+// 自分自身の送信者情報の更新。emailは呼び出し元（Router）でrequireUser_()が返した
+// 本人のメールアドレスを渡す想定で、他人の情報を書き換えることはできない。
+// 名前・電話番号・メールアドレスはすべて必須（空欄は拒否する）。
+function updateSenderInfoForUser_(email, data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var trimmedName = String((data && data.name) || '').trim();
+    var trimmedTel = String((data && data.tel) || '').trim();
+    var trimmedMail = String((data && data.mail) || '').trim();
+    if (!trimmedName || !trimmedTel || !trimmedMail) {
+      throw new Error('担当者名・電話番号・メールアドレスはすべて入力してください。');
+    }
+    var sheet = getPermissionSheet_();
+    var rowIndex = findUserRowIndexByEmail_(sheet, email);
+    if (rowIndex === -1) {
+      throw new Error('ユーザーが見つかりません（' + email + '）。');
+    }
+    var headerIndex = buildPermissionHeaderIndex_(sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]);
+    sheet.getRange(rowIndex, headerIndex['名前'] + 1).setValue(trimmedName);
+    sheet.getRange(rowIndex, headerIndex['電話番号'] + 1).setValue(trimmedTel);
+    sheet.getRange(rowIndex, headerIndex['送信者メール'] + 1).setValue(trimmedMail);
+    return getSenderInfoForUser_(email);
   } finally {
     lock.releaseLock();
   }

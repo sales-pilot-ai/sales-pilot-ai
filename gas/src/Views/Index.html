@@ -53,11 +53,9 @@
             <a class="app-sidebar__link<?= page === 'report' ? ' is-active' : '' ?>" href="#" data-page="report">
               <span aria-hidden="true">📈</span> レポート
             </a>
-            <? if (user.role === 'Admin') { ?>
-              <a class="app-sidebar__link<?= page === 'settings' ? ' is-active' : '' ?>" href="#" data-page="settings">
-                <span aria-hidden="true">⚙️</span> 設定
-              </a>
-            <? } ?>
+            <a class="app-sidebar__link<?= page === 'settings' ? ' is-active' : '' ?>" href="#" data-page="settings">
+              <span aria-hidden="true">⚙️</span> 設定
+            </a>
           </nav>
 
           <div class="app-sidebar__divider"></div>

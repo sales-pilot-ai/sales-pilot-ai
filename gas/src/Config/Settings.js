@@ -6,7 +6,9 @@ var SETTINGS_KEYS = {
   GEMINI_API_KEY: 'GEMINI_API_KEY',
   GEMINI_MODEL: 'GEMINI_MODEL',
   TIMEREX_URL: 'TIMEREX_URL',
-  SALES_PERSON_NAME: 'SALES_PERSON_NAME',
+  // SALES_PERSON_TEL/SALES_PERSON_MAILは、Gmail設定（送信者情報）のユーザーごとの個別管理化
+  // （追加依頼）以降は編集用UIを持たないが、移行前の共通設定値としてPermissionService.jsの
+  // getSenderInfoForUser_()から読み取り専用フォールバックとして参照され続ける。
   SALES_PERSON_TEL: 'SALES_PERSON_TEL',
   SALES_PERSON_MAIL: 'SALES_PERSON_MAIL',
 };
@@ -53,27 +55,6 @@ function getTimeRexUrl_() {
   return url || DEFAULT_TIMEREX_URL;
 }
 
-// スクリプトプロパティを取得する共通ヘルパー。未設定の場合はフォールバックせずエラーとする
-// （GEMINI_MODEL・TIMEREX_URLのようにデフォルト値が許容される設定には使わず、
-// 営業担当者情報のように必須の設定にのみ使用する）。
-function getRequiredScriptProperty_(key) {
-  var value = PropertiesService.getScriptProperties().getProperty(key);
-  if (!value) {
-    throw new Error('スクリプトプロパティ「' + key + '」が設定されていません。');
-  }
-  return value;
-}
-
-// 営業担当者情報（氏名・電話番号・メールアドレス）をまとめて返す。
-// 担当者変更時にコード修正・再デプロイが不要になるよう、スクリプトプロパティから取得する。
-function getSalesPerson_() {
-  return {
-    name: getRequiredScriptProperty_(SETTINGS_KEYS.SALES_PERSON_NAME),
-    tel: getRequiredScriptProperty_(SETTINGS_KEYS.SALES_PERSON_TEL),
-    mail: getRequiredScriptProperty_(SETTINGS_KEYS.SALES_PERSON_MAIL),
-  };
-}
-
 // 設定画面（Sprint7⑥）向けに、現在のスクリプトプロパティを返す。APIキー（MAPS_API_KEY/
 // GEMINI_API_KEY）は値そのものを画面へ渡さず、設定済みかどうかの真偽値のみを返す
 // （画面はパスワード欄を空欄表示し、入力があった場合のみ上書きする設計。値を平文で
@@ -86,9 +67,6 @@ function getSettingsForAdmin_() {
     geminiApiKeySet: !!props.getProperty(SETTINGS_KEYS.GEMINI_API_KEY),
     geminiModel: props.getProperty(SETTINGS_KEYS.GEMINI_MODEL) || DEFAULT_GEMINI_MODEL,
     timeRexUrl: props.getProperty(SETTINGS_KEYS.TIMEREX_URL) || DEFAULT_TIMEREX_URL,
-    salesPersonName: props.getProperty(SETTINGS_KEYS.SALES_PERSON_NAME) || '',
-    salesPersonTel: props.getProperty(SETTINGS_KEYS.SALES_PERSON_TEL) || '',
-    salesPersonMail: props.getProperty(SETTINGS_KEYS.SALES_PERSON_MAIL) || '',
   };
 }
 
@@ -115,24 +93,6 @@ function updateSettings_(data) {
   }
   if (data.timeRexUrl !== undefined) {
     props.setProperty(SETTINGS_KEYS.TIMEREX_URL, data.timeRexUrl || DEFAULT_TIMEREX_URL);
-  }
-  if (data.salesPersonName !== undefined) {
-    if (!data.salesPersonName) {
-      throw new Error('営業担当者名は必須です。');
-    }
-    props.setProperty(SETTINGS_KEYS.SALES_PERSON_NAME, data.salesPersonName);
-  }
-  if (data.salesPersonTel !== undefined) {
-    if (!data.salesPersonTel) {
-      throw new Error('営業担当者の電話番号は必須です。');
-    }
-    props.setProperty(SETTINGS_KEYS.SALES_PERSON_TEL, data.salesPersonTel);
-  }
-  if (data.salesPersonMail !== undefined) {
-    if (!data.salesPersonMail) {
-      throw new Error('営業担当者のメールアドレスは必須です。');
-    }
-    props.setProperty(SETTINGS_KEYS.SALES_PERSON_MAIL, data.salesPersonMail);
   }
 
   return getSettingsForAdmin_();

@@ -1,68 +1,82 @@
 <section class="settings">
-  <p id="settings-loading" class="empty-state">読み込み中…</p>
-  <p id="settings-error" class="error-message" hidden></p>
-
-  <form id="settings-form" hidden>
+  <!-- Gmail設定（送信者情報）: 追加依頼によりUser/Admin共通で表示し、自分自身の情報のみ
+       編集できるようにした（署名に使う名前・電話番号・メールアドレスをユーザーごとに
+       個別管理する）。 -->
+  <p id="sender-info-loading" class="empty-state">読み込み中…</p>
+  <p id="sender-info-error" class="error-message" hidden></p>
+  <form id="sender-info-form" hidden>
     <div class="settings__section">
       <h2>Gmail設定（送信者情報）</h2>
       <p class="templates__placeholder-hint">
-        営業メール・返信メールの署名に使用する情報です。実際の送信は、ログイン中のGoogleアカウントのGmailから行われます。
+        営業メール・返信メールの署名に使用する、あなた自身の情報です。実際の送信は、ログイン中のGoogleアカウントのGmailから行われます。
       </p>
-      <label for="setting-sales-person-name">担当者名</label>
-      <input type="text" id="setting-sales-person-name" required />
-      <label for="setting-sales-person-tel">電話番号</label>
-      <input type="text" id="setting-sales-person-tel" required />
-      <label for="setting-sales-person-mail">メールアドレス</label>
-      <input type="email" id="setting-sales-person-mail" required />
+      <label for="sender-info-name">担当者名</label>
+      <input type="text" id="sender-info-name" required />
+      <label for="sender-info-tel">電話番号</label>
+      <input type="text" id="sender-info-tel" required />
+      <label for="sender-info-mail">メールアドレス</label>
+      <input type="email" id="sender-info-mail" required />
+      <button type="submit" class="button" id="sender-info-save-button">保存</button>
     </div>
-
-    <div class="settings__section">
-      <h2>Gemini API設定</h2>
-      <label for="setting-gemini-api-key">APIキー <span id="setting-gemini-api-key-status" class="settings__key-status"></span></label>
-      <input type="password" id="setting-gemini-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
-      <label for="setting-gemini-model">使用モデル</label>
-      <input type="text" id="setting-gemini-model" />
-    </div>
-
-    <div class="settings__section">
-      <h2>システム設定</h2>
-      <label for="setting-spreadsheet-id">スプレッドシートID</label>
-      <input type="text" id="setting-spreadsheet-id" required />
-      <label for="setting-maps-api-key">Google Maps APIキー <span id="setting-maps-api-key-status" class="settings__key-status"></span></label>
-      <input type="password" id="setting-maps-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
-    </div>
-
-    <div class="settings__section">
-      <h2>デフォルト値設定</h2>
-      <label for="setting-timerex-url">TimeRex（日程調整）URL</label>
-      <input type="text" id="setting-timerex-url" />
-    </div>
-
-    <button type="submit" class="button" id="settings-save-button">保存</button>
   </form>
 
-  <!-- ユーザー管理（Sprint8⑤、Admin専用）。設定フォームとは独立した一覧＋都度保存の
-       操作のため、上記フォームには含めず別セクションにする。 -->
-  <div class="settings__section">
-    <div class="templates__section-header">
-      <h2>ユーザー管理</h2>
-      <button type="button" class="button" id="user-create-button">新規ユーザー追加</button>
+  <!-- 以下はAdmin専用セクション（Gemini API設定・システム設定・デフォルト値設定・
+       ユーザー管理）。設定画面自体はUser/Adminともにアクセスできるようにしたため、
+       このコンテナごとクライアント側の役割判定で表示・非表示を切り替える
+       （サーバー側のRouter層では引き続きrequireAdmin_()で個別に保護している）。 -->
+  <div id="admin-settings-root" hidden>
+    <p id="settings-loading" class="empty-state">読み込み中…</p>
+    <p id="settings-error" class="error-message" hidden></p>
+
+    <form id="settings-form" hidden>
+      <div class="settings__section">
+        <h2>Gemini API設定</h2>
+        <label for="setting-gemini-api-key">APIキー <span id="setting-gemini-api-key-status" class="settings__key-status"></span></label>
+        <input type="password" id="setting-gemini-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
+        <label for="setting-gemini-model">使用モデル</label>
+        <input type="text" id="setting-gemini-model" />
+      </div>
+
+      <div class="settings__section">
+        <h2>システム設定</h2>
+        <label for="setting-spreadsheet-id">スプレッドシートID</label>
+        <input type="text" id="setting-spreadsheet-id" required />
+        <label for="setting-maps-api-key">Google Maps APIキー <span id="setting-maps-api-key-status" class="settings__key-status"></span></label>
+        <input type="password" id="setting-maps-api-key" placeholder="変更する場合のみ入力してください" autocomplete="new-password" />
+      </div>
+
+      <div class="settings__section">
+        <h2>デフォルト値設定</h2>
+        <label for="setting-timerex-url">TimeRex（日程調整）URL</label>
+        <input type="text" id="setting-timerex-url" />
+      </div>
+
+      <button type="submit" class="button" id="settings-save-button">保存</button>
+    </form>
+
+    <!-- ユーザー管理（Sprint8⑤、Admin専用）。設定フォームとは独立した一覧＋都度保存の
+         操作のため、上記フォームには含めず別セクションにする。 -->
+    <div class="settings__section">
+      <div class="templates__section-header">
+        <h2>ユーザー管理</h2>
+        <button type="button" class="button" id="user-create-button">新規ユーザー追加</button>
+      </div>
+      <p id="user-list-loading" class="empty-state">読み込み中…</p>
+      <p id="user-list-error" class="error-message" hidden></p>
+      <table class="company-table" id="user-table" hidden>
+        <thead>
+          <tr>
+            <th>名前</th>
+            <th>メールアドレス</th>
+            <th>権限</th>
+            <th>作成日時</th>
+            <th>最終ログイン日時</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="user-table-body"></tbody>
+      </table>
     </div>
-    <p id="user-list-loading" class="empty-state">読み込み中…</p>
-    <p id="user-list-error" class="error-message" hidden></p>
-    <table class="company-table" id="user-table" hidden>
-      <thead>
-        <tr>
-          <th>名前</th>
-          <th>メールアドレス</th>
-          <th>権限</th>
-          <th>作成日時</th>
-          <th>最終ログイン日時</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody id="user-table-body"></tbody>
-    </table>
   </div>
 </section>
 
@@ -88,13 +102,78 @@
 
 <script>
   (function () {
+    // ===== Gmail設定（送信者情報）: User/Admin共通、自分自身の情報のみ（追加依頼） =====
+
+    var senderInfoLoadingEl = document.getElementById('sender-info-loading');
+    var senderInfoErrorEl = document.getElementById('sender-info-error');
+    var senderInfoFormEl = document.getElementById('sender-info-form');
+    var senderInfoNameInput = document.getElementById('sender-info-name');
+    var senderInfoTelInput = document.getElementById('sender-info-tel');
+    var senderInfoMailInput = document.getElementById('sender-info-mail');
+
+    function loadSenderInfo() {
+      senderInfoLoadingEl.hidden = false;
+      senderInfoErrorEl.hidden = true;
+      senderInfoFormEl.hidden = true;
+
+      google.script.run
+        .withSuccessHandler(function (info) {
+          senderInfoLoadingEl.hidden = true;
+          senderInfoFormEl.hidden = false;
+          info = info || {};
+          senderInfoNameInput.value = info.name || '';
+          senderInfoTelInput.value = info.tel || '';
+          senderInfoMailInput.value = info.mail || '';
+        })
+        .withFailureHandler(function (error) {
+          senderInfoLoadingEl.hidden = true;
+          senderInfoErrorEl.hidden = false;
+          senderInfoErrorEl.textContent = error && error.message ? error.message : String(error);
+        })
+        .getMySenderInfo();
+    }
+
+    senderInfoFormEl.addEventListener('submit', function (event) {
+      event.preventDefault();
+
+      var data = {
+        name: senderInfoNameInput.value,
+        tel: senderInfoTelInput.value,
+        mail: senderInfoMailInput.value,
+      };
+
+      var saveButton = document.getElementById('sender-info-save-button');
+      var originalText = saveButton.textContent;
+      saveButton.disabled = true;
+      saveButton.classList.add('button--loading');
+      var toast = showToast('保存しています…', 'loading', { persist: true });
+
+      google.script.run
+        .withSuccessHandler(function (info) {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          saveButton.textContent = originalText;
+          toast.update('Gmail設定（送信者情報）を保存しました。', 'success');
+          info = info || {};
+          senderInfoNameInput.value = info.name || '';
+          senderInfoTelInput.value = info.tel || '';
+          senderInfoMailInput.value = info.mail || '';
+        })
+        .withFailureHandler(function (error) {
+          saveButton.disabled = false;
+          saveButton.classList.remove('button--loading');
+          saveButton.textContent = originalText;
+          toast.update('保存に失敗しました: ' + (error && error.message ? error.message : String(error)), 'error');
+        })
+        .updateMySenderInfo(data);
+    });
+
+    // ===== Admin専用セクション（Gemini API設定・システム設定・デフォルト値設定） =====
+
     var loadingEl = document.getElementById('settings-loading');
     var errorEl = document.getElementById('settings-error');
     var formEl = document.getElementById('settings-form');
 
-    var salesPersonNameInput = document.getElementById('setting-sales-person-name');
-    var salesPersonTelInput = document.getElementById('setting-sales-person-tel');
-    var salesPersonMailInput = document.getElementById('setting-sales-person-mail');
     var geminiApiKeyInput = document.getElementById('setting-gemini-api-key');
     var geminiApiKeyStatusEl = document.getElementById('setting-gemini-api-key-status');
     var geminiModelInput = document.getElementById('setting-gemini-model');
@@ -125,9 +204,6 @@
     // APIキーの入力欄は常に空欄のまま表示する（値そのものは画面へ返さない設計。
     // 「設定済み/未設定」のみをラベル横に表示し、変更したい場合だけ入力してもらう）。
     function applySettings(settings) {
-      salesPersonNameInput.value = settings.salesPersonName || '';
-      salesPersonTelInput.value = settings.salesPersonTel || '';
-      salesPersonMailInput.value = settings.salesPersonMail || '';
       geminiModelInput.value = settings.geminiModel || '';
       spreadsheetIdInput.value = settings.spreadsheetId || '';
       timeRexUrlInput.value = settings.timeRexUrl || '';
@@ -141,9 +217,6 @@
       event.preventDefault();
 
       var data = {
-        salesPersonName: salesPersonNameInput.value,
-        salesPersonTel: salesPersonTelInput.value,
-        salesPersonMail: salesPersonMailInput.value,
         geminiModel: geminiModelInput.value,
         spreadsheetId: spreadsheetIdInput.value,
         timeRexUrl: timeRexUrlInput.value,
@@ -179,8 +252,6 @@
         .updateSettings(data);
     });
 
-    loadSettings();
-
     // ===== ユーザー管理（Sprint8⑤、Admin専用） =====
 
     var users = [];
@@ -200,24 +271,11 @@
       });
     }
 
-    function loadUsers() {
+    function loadUserList() {
       userListLoadingEl.hidden = false;
       userListErrorEl.hidden = true;
       userTableEl.hidden = true;
 
-      google.script.run
-        .withSuccessHandler(function (result) {
-          currentUserEmail = result && result.email ? result.email : null;
-          loadUserList();
-        })
-        .withFailureHandler(function () {
-          currentUserEmail = null;
-          loadUserList();
-        })
-        .getCurrentUser();
-    }
-
-    function loadUserList() {
       google.script.run
         .withSuccessHandler(function (result) {
           userListLoadingEl.hidden = true;
@@ -437,6 +495,28 @@
         .deleteUser(email);
     });
 
-    loadUsers();
+    // ===== 初期化: 役割判定してAdmin専用セクションの表示可否を決める（追加依頼） =====
+    // Gmail設定（送信者情報）はUser/Admin共通のため常に読み込む。Admin専用セクション
+    // （Gemini API設定・システム設定・デフォルト値設定・ユーザー管理）は、getCurrentUser()の
+    // roleがAdminの場合のみ表示・読み込みする。UI側の表示切り替えに加え、各Router関数
+    // （getSettings/updateSettings/listUsers/createUser/updateUserRole/deleteUser）は
+    // サーバー側でも引き続きrequireAdmin_()により保護されている。
+    var adminSettingsRootEl = document.getElementById('admin-settings-root');
+
+    loadSenderInfo();
+
+    google.script.run
+      .withSuccessHandler(function (user) {
+        currentUserEmail = user && user.email ? user.email : null;
+        if (user && user.role === 'Admin') {
+          adminSettingsRootEl.hidden = false;
+          loadSettings();
+          loadUserList();
+        }
+      })
+      .withFailureHandler(function () {
+        // 権限判定に失敗した場合はAdmin専用セクションを表示しない（安全側に倒す）。
+      })
+      .getCurrentUser();
   })();
 </script>
